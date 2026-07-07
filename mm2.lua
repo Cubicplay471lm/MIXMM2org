@@ -255,7 +255,7 @@ end
 
 local function AutoFarmLoop() while AutoFarmEnabled do task.wait(0.1) pcall(function()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-[7/7/2026 9:28 PM] .: local t = GetNearestPlayer(50)
+local t = GetNearestPlayer(50)
     if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
         LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
     end
@@ -316,7 +316,7 @@ VisualsTab:CreateToggle({ Name = "Box ESP", CurrentValue = true, Callback = func
 VisualsTab:CreateToggle({ Name = "Name ESP", CurrentValue = true, Callback = function(s) ESPNameEnabled = s end })
 VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = true, Callback = function(s) ESPHealthEnabled = s end })
 VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = true, Callback = function(s) ESPDistanceEnabled = s end })
-[7/7/2026 9:28 PM] .: MovementTab:CreateSection("Movement")
+MovementTab:CreateSection("Movement")
 MovementTab:CreateToggle({ Name = "Noclip", CurrentValue = false, Callback = ToggleNoclip })
 MovementTab:CreateToggle({ Name = "Fly", CurrentValue = false, Callback = ToggleFly })
 MovementTab:CreateSlider({ Name = "Fly Speed", Range = {20,200}, Increment = 5, CurrentValue = 50, Callback = function(v) FlySpeed = v end })
