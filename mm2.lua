@@ -48,6 +48,7 @@ local NoclipConnection = nil
 local FlyConnection = nil
 local FlingEnabled = false
 local FlingConnection = nil
+local FlingParts = {}
 local GunGrabEnabled = false
 local GunGrabConnection = nil
 
@@ -194,15 +195,28 @@ task.spawn(function() while true do if ESPEnabled then UpdateESP() end; task.wai
 local function ToggleNoclip(state)
     NoclipEnabled = state
     if state then
+        if NoclipConnection then NoclipConnection:Disconnect() end
         NoclipConnection = RunService.Stepped:Connect(function()
             if LocalPlayer.Character then
                 for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                    if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
                 end
             end
         end)
     else
-        if NoclipConnection then NoclipConnection:Disconnect(); NoclipConnection = nil end
+        if NoclipConnection then
+            NoclipConnection:Disconnect()
+            NoclipConnection = nil
+        end
+        if LocalPlayer.Character then
+            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
     end
 end
 
@@ -239,47 +253,91 @@ end
 -- ==================== FLING ====================
 local function ToggleFling(state)
     FlingEnabled = state
+    
     if state then
         if not LocalPlayer.Character then return end
+        
+        FlingParts = {}
         for _, child in pairs(LocalPlayer.Character:GetDescendants()) do
             if child:IsA("BasePart") then
+                table.insert(FlingParts, {
+                    Part = child,
+                    CanCollide = child.CanCollide,
+                    Massless = child.Massless,
+                    CustomPhysicalProperties = child.CustomPhysicalProperties
+                })
                 child.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5)
+                child.CanCollide = false
+                child.Massless = true
+                child.Velocity = Vector3.new(0, 0, 0)
             end
         end
-        ToggleNoclip(true)
-        wait(0.1)
+        
         local bambam = Instance.new("BodyAngularVelocity")
-        bambam.Name = "Fling_"
+        bambam.Name = "Fling_Body"
         bambam.Parent = LocalPlayer.Character.HumanoidRootPart
         bambam.AngularVelocity = Vector3.new(0, 99999, 0)
         bambam.MaxTorque = Vector3.new(0, math.huge, 0)
         bambam.P = math.huge
-        local Char = LocalPlayer.Character:GetChildren()
-        for i, v in next, Char do
-            if v:IsA("BasePart") then
-                v.CanCollide = false
-                v.Massless = true
-                v.Velocity = Vector3.new(0, 0, 0)
-            end
+        
+        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then
+            hum.PlatformStand = false
+            hum.AutoRotate = false
         end
+        
         FlingConnection = RunService.RenderStepped:Connect(function()
-            if FlingEnabled and bambam and bambam.Parent then
-                bambam.AngularVelocity = Vector3.new(0, 99999, 0)
-                wait(0.2)
-                bambam.AngularVelocity = Vector3.new(0, 0, 0)
-                wait(0.1)
+            if FlingEnabled and LocalPlayer.Character then
+                local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local bambam = root:FindFirstChild("Fling_Body")
+                    if bambam then
+                        bambam.AngularVelocity = Vector3.new(0, 99999, 0)
+                        task.wait(0.2)
+                        bambam.AngularVelocity = Vector3.new(0, 0, 0)
+                        task.wait(0.1)
+                    end
+                end
             end
         end)
+        
+        ToggleNoclip(true)
+        
     else
-        if FlingConnection then FlingConnection:Disconnect(); FlingConnection = nil end
-        if LocalPlayer.Character then
-            local bambam = LocalPlayer.Character:FindFirstChild("Fling_")
-            if bambam then bambam:Destroy() end
+        if FlingConnection then
+            FlingConnection:Disconnect()
+            FlingConnection = nil
         end
+        
+        if LocalPlayer.Character then
+            local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local bambam = root:FindFirstChild("Fling_Body")
+                if bambam then bambam:Destroy() end
+            end
+            
+            for _, data in ipairs(FlingParts) do
+                if data.Part and data.Part.Parent then
+                    data.Part.CanCollide = data.CanCollide
+                    data.Part.Massless = data.Massless
+                    data.Part.CustomPhysicalProperties = data.CustomPhysicalProperties
+                    data.Part.Velocity = Vector3.new(0, 0, 0)
+                end
+            end
+            FlingParts = {}
+            
+            local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum.AutoRotate = true
+            end
+        end
+        
+        ToggleNoclip(false)
     end
 end
 
--- ==================== GUN GRAB (Teleport to Weapon) ====================
+-- ==================== GUN GRAB ====================
 local function ToggleGunGrab(state)
     GunGrabEnabled = state
     if state then
@@ -291,15 +349,18 @@ local function ToggleGunGrab(state)
                     if rootPart then
                         local pos = rootPart.Position
                         LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
-                        wait(0.5)
-                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 0, 0)) -- Возврат в центр карты
+                        task.wait(0.5)
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 0, 0))
                         break
                     end
                 end
             end
         end)
     else
-        if GunGrabConnection then GunGrabConnection:Disconnect(); GunGrabConnection = nil end
+        if GunGrabConnection then
+            GunGrabConnection:Disconnect()
+            GunGrabConnection = nil
+        end
     end
 end
 
