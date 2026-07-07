@@ -1,4 +1,4 @@
-[7/7/2026 8:44 PM] .: --[[
+--[[
     MM2 Script - Rayfield
 ]]
 
@@ -126,7 +126,7 @@ local function KillAuraLoop()
         end)
     end
 end
-[7/7/2026 8:44 PM] .: -- God Mode
+-- God Mode
 local function ToggleGodMode(state)
     GodModeEnabled = state
     pcall(function()
@@ -268,7 +268,7 @@ local teleportDropdown = TeleportTab:CreateDropdown({
     Flag = "TeleportPlayer",
     Callback = function(name)
         for _, player in ipairs(Players:GetPlayers()) do
-[7/7/2026 8:44 PM] .: if player.Name == name and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if player.Name == name and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     LocalPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame
                 end
