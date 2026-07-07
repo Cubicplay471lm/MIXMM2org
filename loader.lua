@@ -26,11 +26,7 @@ local Window = Rayfield:CreateWindow({
         SaveKey = true,
         GrabKeyFromSite = false,
         Key = {
-            "mixware2026",
-            "kt471",
-            "hokpry",
-            "mixmm2ontop",
-            "admin123"
+            "MIXWAREONTOP", "mixwareontop", "mixbestwarescript"
         }
     }
 })
