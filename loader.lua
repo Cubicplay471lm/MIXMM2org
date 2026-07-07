@@ -1,7 +1,7 @@
 local gameId = game.GameId
 
 if gameId == 66654135 then
-	local code = game:HttpGet("https://raw.githubusercontent.com/Cubicplay471lm/MIXMM2org/refs/heads/main/mm2.lua?token=GHSAT0AAAAAAEBJJ3VSBZAQ5CFJ2UWWNVEW2SNDTZQ")
+	local code = game:HttpGet("https://raw.githubusercontent.com/Cubicplay471lm/MIXMM2org/refs/heads/main/mm2.lua")
 	loadstring(code)()
     
 elseif gameId == 9876543210 then
