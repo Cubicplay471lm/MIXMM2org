@@ -1,82 +1,108 @@
 -- ============================================
--- MIXWARE.LOL | MM2 Script
+-- MIXWARE.LOL | LOADER
 -- Разработчики: KT471 & hokpry
 -- Версия: 2.0 | 2026
 -- ============================================
 
-local loader = {
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- ==================== KEY SYSTEM ====================
+local Window = Rayfield:CreateWindow({
     Name = "MIXWARE LOADER",
-    Version = "2.0",
-    Creator = "KT471 & Lmeron",
-    Date = "07.07.2026",
-    Watermark = "NF Project | MM2 Script",
-    ScriptURL = "https://raw.githubusercontent.com/Cubicplay471lm/MIXMM2org/refs/heads/main/mm2.lua"
-}
+    Icon = "download",
+    LoadingTitle = "MIXWARE LOADER",
+    LoadingSubtitle = "by KT471 & hokpry",
+    Theme = "DarkBlue",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = { Enabled = true, FolderName = "mixware", FileName = "config" },
+    Discord = { Enabled = false, Invite = "", RememberJoins = true },
+    KeySystem = true,
+    KeySettings = {
+        Title = "MIXWARE | Key System",
+        Subtitle = "Введите ключ для доступа",
+        Note = "Ключ можно получить у разработчиков",
+        FileName = "mixware_key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {
+            "mixware2026",
+            "kt471",
+            "hokpry",
+            "mixmm2ontop",
+            "admin123"
+        }
+    }
+})
 
-print("[MIXWARE] Загрузка...")
-print("[MIXWARE] Версия: " .. loader.Version)
-print("[MIXWARE] Разработчики: " .. loader.Creator)
-print("[MIXWARE] Дата: " .. loader.Date)
+local LoaderTab = Window:CreateTab("Loader", "download")
+local InfoTab = Window:CreateTab("Info", "info")
+local CreditsTab = Window:CreateTab("Credits", "users")
 
--- Водяной знак
-local function CreateWatermark()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "Watermark"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = game:GetService("CoreGui")
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 30)
-    frame.Position = UDim2.new(0, 10, 1, -40)
-    frame.BackgroundTransparency = 0.6
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    frame.BorderSizePixel = 0
-    frame.Parent = screenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
-    
-    local shadow = Instance.new("UIGradient")
-    shadow.Rotation = 45
-    shadow.Parent = frame
-    
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1, 0, 1, 0)
-    text.BackgroundTransparency = 1
-    text.Text = "NF Project | MM2 Script | " .. os.date("%H:%M:%S") .. " | " .. game:GetService("RunService").RenderStepped:Wait()
-    text.TextColor3 = Color3.fromRGB(180, 180, 200)
-    text.TextSize = 14
-    text.Font = Enum.Font.GothamBold
-    text.TextXAlignment = Enum.TextXAlignment.Center
-    text.TextYAlignment = Enum.TextYAlignment.Center
-    text.Parent = frame
-    
-    -- Обновление времени
-    spawn(function()
-        while true do
-            task.wait(1)
-            text.Text = "NF Project | MM2 Script | " .. os.date("%H:%M:%S") .. " | MIXWARE"
+-- Информация
+InfoTab:CreateParagraph({
+    Title = "MIXWARE LOADER",
+    Content = "Версия: 2.0\nДата: 07.07.2026\nСтатус: ONLINE\n\nРазработчики: KT471 & hokpry"
+})
+
+InfoTab:CreateParagraph({
+    Title = "MIXWARE",
+    Content = "Добро пожаловать в MIXWARE!\nНаш сайт: mixware.lol"
+})
+
+CreditsTab:CreateParagraph({
+    Title = "Разработчики",
+    Content = "KT471 (Главный разработчик)\nhokpry (Соразработчик)"
+})
+
+CreditsTab:CreateParagraph({
+    Title = "Благодарности",
+    Content = "Спасибо за использование MIXWARE!\n\nНаш сайт: mixware.lol"
+})
+
+-- Основная вкладка
+LoaderTab:CreateParagraph({
+    Title = "MIXWARE LOADER",
+    Content = "Нажми кнопку ниже для загрузки MM2 скрипта"
+})
+
+LoaderTab:CreateButton({
+    Name = "Загрузить MM2 Script",
+    Callback = function()
+        Window:Destroy()
+        Rayfield:Notify({
+            Title = "MIXWARE",
+            Content = "Загрузка MM2 Script...",
+            Duration = 2,
+            Image = "download"
+        })
+        
+        local success, result = pcall(function()
+            return game:HttpGet("https://raw.githubusercontent.com/Cubicplay471lm/MIXMM2org/refs/heads/main/mm2.lua")
+        end)
+        
+        if success then
+            loadstring(result)()
+            Rayfield:Notify({
+                Title = "MIXWARE",
+                Content = "MM2 Script загружен!",
+                Duration = 3,
+                Image = "check"
+            })
+        else
+            Rayfield:Notify({
+                Title = "MIXWARE",
+                Content = "Ошибка загрузки: " .. tostring(result),
+                Duration = 5,
+                Image = "x"
+            })
         end
-    end)
-    
-    return screenGui
-end
+    end
+})
 
--- Вызов водяного знака
-CreateWatermark()
-
--- Загрузка основного скрипта
-local success, result = pcall(function()
-    return game:HttpGet(loader.ScriptURL)
-end)
-
-if success then
-    loadstring(result)()
-    print("[MIXWARE] Скрипт загружен успешно!")
-else
-    print("[MIXWARE] Ошибка загрузки: " .. tostring(result))
-    print("[MIXWARE] Загружаем резервную версию...")
-    local backup = game:HttpGet("https://pastebin.com/raw/альтернативная_ссылка")
-    loadstring(backup)()
-end
+LoaderTab:CreateButton({
+    Name = "Закрыть лоадер",
+    Callback = function()
+        Window:Destroy()
+    end
+})
