@@ -7,57 +7,7 @@ local function safeRequire(module)
     return success, result
 end
 
--- Обёртка для безопасного HttpGet (для разных экзекуторов)
-local function secureHttpGet(url)
-    local success, result = pcall(function()
-        return game:HttpGet(url)
-    end)
-    if success then
-        return result
-    else
-        -- Альтернативный метод для некоторых экзекуторов
-        local success2, result2 = pcall(function()
-            return syn and syn.request({Url = url, Method = "GET"}) or request({Url = url, Method = "GET"})
-        end)
-        if success2 then
-            return result2.Body or result2
-        end
-        return nil
-    end
-end
-
--- ============ ЗАГРУЗКА WINDUI (УЛУЧШЕННАЯ) ============
-local WindUI = nil
-
--- Пытаемся загрузить локально
-local loadSuccess, loadedUI = pcall(function()
-    return require("./src/Init")
-end)
-
-if loadSuccess then
-    WindUI = loadedUI
-    print("[NF] WindUI загружен локально")
-else
-    -- Загрузка через HTTPS (с резервными ссылками)
-    local urls = {
-        "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
-        "https://pastebin.com/raw/XYZ12345", -- Резервная ссылка
-    }
-    
-    for _, url in ipairs(urls) do
-        local content = secureHttpGet(url)
-        if content then
-            local success, result = pcall(function()
-                return loadstring(content)()
-            end)
-            if success then
-                WindUI = result
-                print("[NF] WindUI загружен через HTTP: " .. url)
-                break
-            end
-        end
-    end
-end
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
 -- Если WindUI не загрузился - создаём минимальный GUI
 if not WindUI then
