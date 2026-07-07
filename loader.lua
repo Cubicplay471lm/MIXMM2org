@@ -7,7 +7,7 @@
 local loader = {
     Name = "MIXWARE LOADER",
     Version = "2.0",
-    Creator = "KT471 & hokpry",
+    Creator = "KT471 & Lmeron",
     Date = "07.07.2026",
     Watermark = "NF Project | MM2 Script",
     ScriptURL = "https://raw.githubusercontent.com/Cubicplay471lm/MIXMM2org/refs/heads/main/mm2.lua"
