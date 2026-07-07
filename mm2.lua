@@ -1,254 +1,95 @@
--- ============ ОПТИМИЗАЦИЯ ДЛЯ ЭКЗЕКУТОРА ============
--- Обёртка для безопасной загрузки
-local function safeRequire(module)
-    local success, result = pcall(function()
-        return require(module)
-    end)
-    return success, result
-end
+[7/7/2026 8:44 PM] .: --[[
+    MM2 Script - Rayfield
+]]
 
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Если WindUI не загрузился - создаём минимальный GUI
-if not WindUI then
-    print("[NF] Создание резервного GUI")
-    WindUI = {
-        CreateWindow = function(config)
-            return {
-                Tab = function() return {} end,
-                Notify = function() end,
-                Destroy = function() end
-            }
-        end
-    }
-end
+local Window = Rayfield:CreateWindow({
+    Name = "MM2 Script",
+    Icon = "skull",
+    LoadingTitle = "MM2 Script Loading",
+    LoadingSubtitle = "by .ftgs",
+    Theme = "DarkBlue",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "mm2script",
+        FileName = "config"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = true
+    },
+    KeySystem = false,
+})
 
--- ============ ПОДКЛЮЧЕНИЕ СЕРВИСОВ (С ЗАЩИТОЙ) ============
-local Services = {
-    RunService = game:GetService("RunService"),
-    Players = game:GetService("Players"),
-    Workspace = game:GetService("Workspace"),
-    UserInputService = game:GetService("UserInputService"),
-    TweenService = game:GetService("TweenService"),
-    ReplicatedStorage = game:GetService("ReplicatedStorage"),
-    TeleportService = game:GetService("TeleportService"),
-    VirtualUser = game:GetService("VirtualUser") -- Для эмуляции ввода
-}
-
-local LocalPlayer = Services.Players.LocalPlayer
-local RunService = Services.RunService
-local Players = Services.Players
-local Workspace = Services.Workspace
-local ReplicatedStorage = Services.ReplicatedStorage
-
--- ============ КЛОН REF (ДЛЯ ОБХОДА АНТИЧИТА) ============
-local cloneref = cloneref or clonereference or function(instance)
-    return instance
-end
-
--- Клонируем важные объекты для обхода античита
-local clonedRemote = ReplicatedStorage and cloneref(ReplicatedStorage) or nil
-local clonedPlayers = cloneref(Players)
-
--- ============ ПЕРЕМЕННЫЕ ============
+-- Variables
 local ESPEnabled = false
-local ESPObjects = {}
 local AutoFarmEnabled = false
 local KillAuraEnabled = false
 local GodModeEnabled = false
-local TeleportEnabled = false
 local CoinFarmEnabled = false
-local FastJumpEnabled = false
-local AntiAFKEnabled = false
-
 local KillAuraRange = 15
 local WalkSpeed = 16
 local JumpPower = 50
-local AttackCooldown = false
-local CoinsCollected = 0
+local ESPHighlights = {}
 
--- ============ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============
-local function getCharacter(plr)
-    if not plr then return nil end
-    local char = plr.Character
-    if char and char.Parent == Workspace then
-        return char
-    end
-    return nil
-end
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 
-local function getRootPart(char)
-    if not char then return nil end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if root and root.Parent == char then
-        return root
-    end
-    return nil
-end
-
-local function getHumanoid(char)
-    if not char then return nil end
-    local hum = char:FindFirstChild("Humanoid")
-    if hum and hum.Parent == char then
-        return hum
-    end
-    return nil
-end
-
--- ============ ESP (С ИСПРАВЛЕНИЯМИ ДЛЯ ЭКЗЕКУТОРА) ============
+-- ESP
 local function CreateESP(player)
-    if not player or not player.Character then return end
-    
-    local char = player.Character
-    local name = player.Name
-    
-    -- Создаём Highlight через Drawing (для некоторых экзекуторов)
+    if player == LocalPlayer then return end
     local highlight = Instance.new("Highlight")
-    highlight.Name = "ESP_" .. name
+    highlight.Name = "ESP"
     highlight.FillTransparency = 1
-    highlight.OutlineColor = Color3.fromRGB(255, 50, 50)
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
     highlight.OutlineTransparency = 0
-    highlight.Parent = char
+    highlight.Parent = player.Character or nil
+    ESPHighlights[player] = highlight
     
-    -- Billboard
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ESP_Billboard_" .. name
-    billboard.Size = UDim2.new(0, 100, 0, 20)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = char
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = Color3.fromRGB(255, 50, 50)
-    label.TextStrokeTransparency = 0
-    label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 14
-    label.Parent = billboard
-    
-    table.insert(ESPObjects, {
-        Highlight = highlight,
-        Billboard = billboard,
-        Player = player
-    })
+    player.CharacterAdded:Connect(function(char)
+        if ESPEnabled then
+            highlight.Parent = char
+        end
+    end)
+end
+
+local function RemoveESP(player)
+    if ESPHighlights[player] then
+        ESPHighlights[player]:Destroy()
+        ESPHighlights[player] = nil
+    end
 end
 
 local function ToggleESP(state)
     ESPEnabled = state
-    
     if state then
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                CreateESP(player)
-            end
+            CreateESP(player)
         end
-        
-        -- Следим за новыми игроками
-        Players.PlayerAdded:Connect(function(player)
-            if ESPEnabled then
-                player.CharacterAdded:Connect(function(char)
-                    task.wait(0.5)
-                    if ESPEnabled then
-                        CreateESP(player)
-                    end
-                end)
-            end
-        end)
     else
-        for _, esp in ipairs(ESPObjects) do
-            pcall(function()
-                esp.Highlight:Destroy()
-                esp.Billboard:Destroy()
-            end)
+        for player, _ in pairs(ESPHighlights) do
+            RemoveESP(player)
         end
-        ESPObjects = {}
     end
 end
 
--- ============ АТАКА (С РАБОЧИМ УДАРОМ) ============
-local function AttackPlayer(player)
-    if not player or not player.Character or AttackCooldown then return end
-    AttackCooldown = true
-    
-    local char = player.Character
-    local root = getRootPart(char)
-    if not root then return end
-    
-    -- Метод 1: Remote
-    local remoteNames = {"RemoteEvent", "AttackRemote", "MurdererAttack", "KnifeRemote", "HitRemote"}
-    local foundRemote = false
-    
-    for _, name in ipairs(remoteNames) do
-        local remote = ReplicatedStorage:FindFirstChild(name)
-        if remote then
-            pcall(function()
-                remote:FireServer(char)
-                print("[NF] Атака через " .. name)
-                foundRemote = true
-            end)
-            break
-        end
-    end
-    
-    -- Метод 2: Через инструмент
-    if not foundRemote then
-        local tools = {
-            LocalPlayer.Backpack:GetChildren(),
-            LocalPlayer.Character:GetChildren()
-        }
-        
-        for _, toolList in ipairs(tools) do
-            for _, tool in ipairs(toolList) do
-                if tool:IsA("Tool") then
-                    pcall(function()
-                        tool:Activate()
-                        task.wait(0.05)
-                        tool:Deactivate()
-                        print("[NF] Атака через " .. tool.Name)
-                        foundRemote = true
-                    end)
-                    break
-                end
-            end
-            if foundRemote then break end
-        end
-    end
-    
-    -- Метод 3: FireTouchInterest
-    if not foundRemote then
-        local localRoot = getRootPart(LocalPlayer.Character)
-        if localRoot then
-            pcall(function()
-                firetouchinterest(localRoot, root, 0)
-                task.wait()
-                firetouchinterest(localRoot, root, 1)
-            end)
-        end
-    end
-    
-    task.wait(0.15)
-    AttackCooldown = false
-end
-
--- ============ AUTOFARM ============
+-- Auto Farm
 local function GetNearestPlayer(range)
     local nearest = nil
-    local minDist = range or 50
-    local localRoot = getRootPart(LocalPlayer.Character)
-    
-    if not localRoot then return nil end
-    
+    local minDist = range or math.huge
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local root = getRootPart(player.Character)
-            if root then
-                local dist = (localRoot.Position - root.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    nearest = player
-                end
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = player
             end
         end
     end
@@ -257,419 +98,250 @@ end
 
 local function AutoFarmLoop()
     while AutoFarmEnabled do
-        task.wait(0.2)
-        local localRoot = getRootPart(LocalPlayer.Character)
-        if not localRoot then continue end
-        
-        local target = GetNearestPlayer(50)
-        if target then
-            local targetRoot = getRootPart(target.Character)
-            if targetRoot then
-                localRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 2)
-                task.wait(0.1)
-                AttackPlayer(target)
+        task.wait(0.1)
+        pcall(function()
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+            local target = GetNearestPlayer(50)
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
             end
-        end
+        end)
     end
 end
 
--- ============ KILLAURA ============
+-- Kill Aura
 local function KillAuraLoop()
     while KillAuraEnabled do
-        task.wait(0.1)
-        local localRoot = getRootPart(LocalPlayer.Character)
-        if not localRoot then continue end
-        
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                local targetRoot = getRootPart(player.Character)
-                if targetRoot then
-                    local dist = (localRoot.Position - targetRoot.Position).Magnitude
+        task.wait(0.05)
+        pcall(function()
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
                     if dist <= KillAuraRange then
-                        AttackPlayer(player)
-                        task.wait(0.05)
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame
                     end
                 end
             end
-        end
+        end)
     end
 end
-
--- ============ GODMODE ============
-local GodModeConnection = nil
-
+[7/7/2026 8:44 PM] .: -- God Mode
 local function ToggleGodMode(state)
     GodModeEnabled = state
-    
-    if GodModeConnection then
-        GodModeConnection:Disconnect()
-        GodModeConnection = nil
-    end
-    
-    if state then
-        -- Блокировка урона через Heartbeat
-        GodModeConnection = RunService.Heartbeat:Connect(function()
-            local hum = getHumanoid(LocalPlayer.Character)
-            if hum then
-                hum.Health = hum.MaxHealth
-            end
-        end)
-        
-        -- Дополнительная защита через Remote
-        pcall(function()
-            local damageRemote = ReplicatedStorage:FindFirstChild("DamageRemote")
-            if damageRemote then
-                damageRemote.OnClientEvent:Connect(function(damage)
-                    if GodModeEnabled then
-                        return -- Игнорируем урон
-                    end
-                end)
-            end
-        end)
-    end
+    pcall(function()
+        if not LocalPlayer.Character then return end
+        local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.MaxHealth = state and math.huge or 100
+            humanoid.Health = state and math.huge or 100
+        end
+    end)
 end
 
--- ============ COINFARM (УЛУЧШЕННЫЙ) ============
+-- Coin Farm
 local function CoinFarmLoop()
     while CoinFarmEnabled do
-        task.wait(0.15)
-        local localRoot = getRootPart(LocalPlayer.Character)
-        if not localRoot then continue end
-        
-        local coinObjects = {}
-        
-        -- Собираем все монеты
-        for _, v in ipairs(Workspace:GetDescendants()) do
-            if v:IsA("BasePart") and (v.Name:lower():find("coin") or v.Name:lower():find("gem") or v.Name:lower():find("cash")) then
-                local dist = (localRoot.Position - v.Position).Magnitude
-                if dist < 30 then
-                    table.insert(coinObjects, v)
-                end
-            end
-        end
-        
-        -- Собираем монеты
-        for _, coin in ipairs(coinObjects) do
-            pcall(function()
-                -- Touch метод
-                firetouchinterest(localRoot, coin, 0)
-                task.wait()
-                firetouchinterest(localRoot, coin, 1)
-                
-                -- Remote метод
-                local coinRemote = ReplicatedStorage:FindFirstChild("CoinRemote") 
-                    or ReplicatedStorage:FindFirstChild("Collect")
-                    or ReplicatedStorage:FindFirstChild("Pickup")
-                
-                if coinRemote then
-                    coinRemote:FireServer(coin)
-                end
-            end)
-            CoinsCollected = CoinsCollected + 1
-        end
-    end
-end
-
--- ============ ANTI-AFK ============
-local function AntiAFKLoop()
-    while AntiAFKEnabled do
-        task.wait(60)
+        task.wait(0.1)
         pcall(function()
-            local vu = Services.VirtualUser
-            if vu then
-                vu:CaptureController()
-                vu:ClickButton2(Vector2.new())
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+            for _, v in ipairs(Workspace:GetDescendants()) do
+                if v.Name == "Coin" or v.Name == "CoinContainer" then
+                    local coin = v:IsA("BasePart") and v or v:FindFirstChildWhichIsA("BasePart")
+                    if coin then
+                        firetouchinterest(LocalPlayer.Character.HumanoidRootPart, coin, 0)
+                        firetouchinterest(LocalPlayer.Character.HumanoidRootPart, coin, 1)
+                    end
+                end
             end
         end)
     end
 end
 
--- ============ GUI (С АДАПТАЦИЕЙ) ============
-local Window = WindUI:CreateWindow({
-    Title = "MM2 Script | .ftgs hub",
-    Folder = "mm2script",
-    Icon = "solar:folder-2-bold-duotone",
-    NewElements = true,
-    OpenButton = {
-        Title = "MM2 Script",
-        CornerRadius = UDim.new(1, 0),
-        Enabled = true,
-        Draggable = true,
-        Color = ColorSequence.new(Color3.fromHex("#FF0000"), Color3.fromHex("#8B0000")),
-    },
-})
+-- Tabs
+local MainTab = Window:CreateTab("Main", "swords")
+local TeleportTab = Window:CreateTab("Teleport", "map-pin")
+local FarmTab = Window:CreateTab("Farm", "coins")
+local MiscTab = Window:CreateTab("Misc", "settings")
 
-Window:Tag({
-    Title = "v2.0 (Executor Optimized)",
-    Icon = "github",
-    Color = Color3.fromHex("#1c1c1c"),
-    Border = true,
-})
-
--- ============ MAIN TAB ============
-local MainTab = Window:Tab({
-    Title = "Main",
-    Icon = "solar:home-2-bold",
-    IconColor = Color3.fromHex("#83889E"),
-    IconShape = "Square",
-    Border = true,
-})
-
-MainTab:Section({ Title = "ESP" })
-MainTab:Toggle({
-    Title = "Player ESP",
-    Desc = "Show players through walls",
+-- Main Tab
+MainTab:CreateSection("ESP")
+MainTab:CreateToggle({
+    Name = "Player ESP",
+    CurrentValue = false,
+    Flag = "ESP",
     Callback = function(state)
         ToggleESP(state)
     end,
 })
 
-MainTab:Space()
-MainTab:Section({ Title = "Combat" })
-
-MainTab:Toggle({
-    Title = "Auto Farm",
-    Desc = "Automatically kill nearest player",
+MainTab:CreateSection("Combat")
+MainTab:CreateToggle({
+    Name = "Auto Farm",
+    CurrentValue = false,
+    Flag = "AutoFarm",
     Callback = function(state)
         AutoFarmEnabled = state
-        if state then
-            task.spawn(AutoFarmLoop)
-        end
+        if state then task.spawn(AutoFarmLoop) end
     end,
 })
 
-MainTab:Space()
-
-MainTab:Toggle({
-    Title = "Kill Aura",
-    Desc = "Kill players within range",
+MainTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAura",
     Callback = function(state)
         KillAuraEnabled = state
-        if state then
-            task.spawn(KillAuraLoop)
-        end
+        if state then task.spawn(KillAuraLoop) end
     end,
 })
 
-MainTab:Slider({
-    Title = "Kill Aura Range",
-    Value = { Min = 5, Max = 50, Default = 15 },
-    Step = 1,
+MainTab:CreateSlider({
+    Name = "Kill Aura Range",
+    Range = {5, 50},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = 15,
+    Flag = "KillAuraRange",
     Callback = function(value)
         KillAuraRange = value
     end,
 })
 
-MainTab:Space()
-MainTab:Section({ Title = "Character" })
-
-MainTab:Toggle({
-    Title = "God Mode",
-    Desc = "Infinite health",
+MainTab:CreateSection("Character")
+MainTab:CreateToggle({
+    Name = "God Mode",
+    CurrentValue = false,
+    Flag = "GodMode",
     Callback = function(state)
         ToggleGodMode(state)
     end,
 })
 
-MainTab:Space()
-
-MainTab:Slider({
-    Title = "Walk Speed",
-    Value = { Min = 16, Max = 200, Default = 16 },
-    Step = 1,
+MainTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
     Callback = function(value)
         WalkSpeed = value
-        local hum = getHumanoid(LocalPlayer.Character)
-        if hum then
-            hum.WalkSpeed = value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = value
         end
     end,
 })
 
-MainTab:Space()
-
-MainTab:Slider({
-    Title = "Jump Power",
-    Value = { Min = 50, Max = 300, Default = 50 },
-    Step = 1,
+MainTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 300},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 50,
+    Flag = "JumpPower",
     Callback = function(value)
         JumpPower = value
-        local hum = getHumanoid(LocalPlayer.Character)
-        if hum then
-            hum.JumpPower = value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.JumpPower = value
         end
     end,
 })
 
--- ============ TELEPORT TAB ============
-local TeleportTab = Window:Tab({
-    Title = "Teleport",
-    Icon = "solar:square-transfer-horizontal-bold",
-    IconColor = Color3.fromHex("#257AF7"),
-    IconShape = "Square",
-    Border = true,
-})
+-- Teleport Tab
+TeleportTab:CreateSection("Teleport to Player")
 
-TeleportTab:Section({ Title = "Teleport to Player" })
+local function GetPlayerNames()
+    local names = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(names, plr.Name)
+        end
+    end
+    return names
+end
 
-local teleportDropdown = TeleportTab:Dropdown({
-    Title = "Select Player",
-    Values = {},
-    Value = nil,
+local teleportDropdown = TeleportTab:CreateDropdown({
+    Name = "Select Player",
+    Options = GetPlayerNames(),
+    CurrentOption = "",
+    Flag = "TeleportPlayer",
     Callback = function(name)
-        if name then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player.Name:lower() == name:lower() then
-                    local targetRoot = getRootPart(player.Character)
-                    local localRoot = getRootPart(LocalPlayer.Character)
-                    if targetRoot and localRoot then
-                        localRoot.CFrame = targetRoot.CFrame
-                    end
-                    break
+        for _, player in ipairs(Players:GetPlayers()) do
+[7/7/2026 8:44 PM] .: if player.Name == name and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame
                 end
             end
         end
     end,
 })
 
-TeleportTab:Button({
-    Title = "Refresh Players",
-    Icon = "refresh-cw",
-    Justify = "Center",
+TeleportTab:CreateButton({
+    Name = "Refresh Players",
     Callback = function()
-        local names = {}
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                table.insert(names, plr.Name)
-            end
-        end
-        teleportDropdown:Refresh(names)
+        teleportDropdown:Refresh(GetPlayerNames())
     end,
 })
 
--- ============ FARM TAB ============
-local FarmTab = Window:Tab({
-    Title = "Farm",
-    Icon = "solar:folder-with-files-bold",
-    IconColor = Color3.fromHex("#ECA201"),
-    IconShape = "Square",
-    Border = true,
-})
-
-FarmTab:Toggle({
-    Title = "Auto Coin Farm",
-    Desc = "Auto collect coins",
+-- Farm Tab
+FarmTab:CreateToggle({
+    Name = "Auto Coin Farm",
+    CurrentValue = false,
+    Flag = "CoinFarm",
     Callback = function(state)
         CoinFarmEnabled = state
-        if state then
-            task.spawn(CoinFarmLoop)
-        end
+        if state then task.spawn(CoinFarmLoop) end
     end,
 })
 
--- ============ MISC TAB ============
-local MiscTab = Window:Tab({
-    Title = "Misc",
-    Icon = "solar:info-square-bold",
-    IconColor = Color3.fromHex("#7775F2"),
-    IconShape = "Square",
-    Border = true,
-})
-
-MiscTab:Toggle({
-    Title = "Anti-AFK",
-    Desc = "Prevent auto-disconnect",
-    Callback = function(state)
-        AntiAFKEnabled = state
-        if state then
-            task.spawn(AntiAFKLoop)
-        end
-    end,
-})
-
-MiscTab:Space()
-
-MiscTab:Button({
-    Title = "Rejoin Server",
-    Icon = "rotate-cw",
-    Justify = "Center",
-    Color = Color3.fromHex("#257AF7"),
+-- Misc Tab
+MiscTab:CreateButton({
+    Name = "Rejoin Server",
     Callback = function()
-        pcall(function()
-            local ts = Services.TeleportService
-            ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-        end)
+        local ts = game:GetService("TeleportService")
+        ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end,
 })
 
-MiscTab:Space()
-
-MiscTab:Button({
-    Title = "Server Hop",
-    Icon = "server",
-    Justify = "Center",
-    Color = Color3.fromHex("#10C550"),
+MiscTab:CreateButton({
+    Name = "Server Hop",
     Callback = function()
-        pcall(function()
-            local ts = Services.TeleportService
-            ts:Teleport(game.PlaceId, LocalPlayer)
-        end)
+        local ts = game:GetService("TeleportService")
+        ts:Teleport(game.PlaceId, LocalPlayer)
     end,
 })
 
-MiscTab:Space()
-
-MiscTab:Button({
-    Title = "Destroy GUI",
-    Icon = "shredder",
-    Justify = "Center",
-    Color = Color3.fromHex("#EF4F1D"),
+MiscTab:CreateButton({
+    Name = "Destroy GUI",
     Callback = function()
-        Window:Destroy()
+        Rayfield:Destroy()
     end,
 })
 
--- ============ ПОСТОЯННЫЕ ОБНОВЛЕНИЯ (ДЛЯ ЭКЗЕКУТОРА) ============
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    
-    local hum = getHumanoid(char)
-    if not hum then return end
-    
-    -- Поддержание скорости
-    if hum.WalkSpeed ~= WalkSpeed then
-        hum.WalkSpeed = WalkSpeed
-    end
-    
-    if hum.JumpPower ~= JumpPower then
-        hum.JumpPower = JumpPower
-    end
-end)
-
--- ============ ПЕРЕЗАГРУЗКА ПРИ РЕСПАВНЕ ============
+-- Handlers
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
-    
-    if GodModeEnabled then
-        ToggleGodMode(true)
-    end
-    
-    local hum = getHumanoid(char)
-    if hum then
-        hum.WalkSpeed = WalkSpeed
-        hum.JumpPower = JumpPower
+    if GodModeEnabled then ToggleGodMode(true) end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = WalkSpeed
+        humanoid.JumpPower = JumpPower
     end
 end)
 
--- ============ УВЕДОМЛЕНИЕ ============
-WindUI:Notify({
-    Title = "MM2 Script",
-    Content = "Script loaded successfully! (Executor Optimized)",
-    Icon = "solar:bell-bold",
-    Duration = 3,
-})
+Players.PlayerAdded:Connect(function(player)
+    if ESPEnabled then
+        player.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            CreateESP(player)
+        end)
+    end
+end)
 
-print("[NF] MM2 Script v2.0 загружен!")
-print("[NF] Игрок: " .. LocalPlayer.Name)
-print("[NF] GameId: " .. game.GameId)
+Rayfield:Notify({
+    Title = "MM2 Script",
+    Content = "Loaded!",
+    Duration = 3,
+    Image = "skull",
+})
