@@ -18,7 +18,7 @@ local Window = Rayfield:CreateWindow({
         Subtitle = "Введите ключ для доступа",
         Note = "Ключ можно получить в Discord",
         FileName = "NFKey",
-        SaveKey = false,  -- Не сохранять ключ
+        SaveKey = true,  -- Не сохранять ключ
         GrabKeyFromSite = false,
         Key = {"mixmm2ontop", "MIXMM2ONTOP"}  -- Список ключей
     }
