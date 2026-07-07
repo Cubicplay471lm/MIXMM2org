@@ -1,8 +1,3 @@
-[7/7/2026 9:09 PM] .: --[[
-    MM2 Script - Rayfield (Обнова)
-    Noclip, Fly, ESP по ролям, ТП фикс
-]]
-
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -118,7 +113,7 @@ local function CreateESP(player)
     
     ESPHighlights[player] = highlight
     ESPBillboards[player] = {billboard = billboard, roleLabel = roleLabel, nameLabel = nameLabel}
-[7/7/2026 9:09 PM] .: local function updateESP()
+    local function updateESP()
         local role = GetPlayerRole(player)
         local color = GetRoleColor(role)
         highlight.OutlineColor = color
@@ -229,7 +224,7 @@ local function ToggleFly(state)
                 
                 humanoidRootPart.Velocity = moveDirection
                 humanoidRootPart.CFrame = CFrame.new(humanoidRootPart.Position) * CFrame.Angles(0, math.rad(humanoidRootPart.Orientation.Y), 0)
-[7/7/2026 9:09 PM] .: end
+            end
         end)
     else
         if FlyConnection then
@@ -327,7 +322,6 @@ local MovementTab = Window:CreateTab("Movement", "plane")
 local TeleportTab = Window:CreateTab("Teleport", "map-pin")
 local FarmTab = Window:CreateTab("Farm", "coins")
 local MiscTab = Window:CreateTab("Misc", "settings")
-[7/7/2026 9:09 PM] .: -- MAIN TAB
 MainTab:CreateSection("ESP")
 MainTab:CreateToggle({
     Name = "Player ESP",
@@ -466,7 +460,7 @@ TeleportTab:CreateButton({
                             Content = "Teleported to " .. player.Name,
                             Duration = 2,
                             Image = "map-pin",
-[7/7/2026 9:09 PM] .: })
+                        })
                         return
                     end
                 end
