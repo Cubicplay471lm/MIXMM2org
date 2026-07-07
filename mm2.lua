@@ -1,19 +1,20 @@
---[[
-    MM2 Script - Rayfield (Полная версия)
-    by .ftgs & NF Project
-]]
+-- ============================================
+-- MIXWARE.LOL | MM2 Script
+-- Разработчики: KT471 & hokpry
+-- Версия: 2.0 | 2026
+-- ============================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "MM2 Script",
+    Name = "MIXWARE | MM2 Script",
     Icon = "skull",
-    LoadingTitle = "MM2 Script Loading",
-    LoadingSubtitle = "by .ftgs & NF",
+    LoadingTitle = "MIXWARE Loading...",
+    LoadingSubtitle = "by KT471 & Lmeron",
     Theme = "DarkBlue",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
-    ConfigurationSaving = { Enabled = true, FolderName = "mm2script", FileName = "config" },
+    ConfigurationSaving = { Enabled = true, FolderName = "mixware", FileName = "config" },
     Discord = { Enabled = false, Invite = "", RememberJoins = true },
     KeySystem = false,
 })
@@ -25,7 +26,6 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Camera = Workspace.CurrentCamera
 local TeleportService = game:GetService("TeleportService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Variables
 local ESPEnabled = false
@@ -39,6 +39,7 @@ local KillAuraEnabled = false
 local GodModeEnabled = false
 local CoinFarmEnabled = false
 local KillAuraRange = 15
+local KillAuraKey = "Q"
 local WalkSpeed = 16
 local JumpPower = 50
 local NoclipEnabled = false
@@ -51,6 +52,58 @@ local FlingConnection = nil
 local FlingParts = {}
 local GunGrabEnabled = false
 local GunGrabConnection = nil
+local KillAuraConnection = nil
+local KillAuraCooldown = false
+
+-- ==================== ВОДЯНОЙ ЗНАК ====================
+local function CreateWatermark()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MIXWARE_Watermark"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = game:GetService("CoreGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 320, 0, 35)
+    frame.Position = UDim2.new(0, 10, 1, -45)
+    frame.BackgroundTransparency = 0.7
+    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+    
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.Text = "MIXWARE | MM2 | " .. os.date("%H:%M:%S") .. " | SPEED: 0"
+    text.TextColor3 = Color3.fromRGB(200, 200, 220)
+    text.TextSize = 15
+    text.Font = Enum.Font.GothamBold
+    text.TextXAlignment = Enum.TextXAlignment.Center
+    text.TextYAlignment = Enum.TextYAlignment.Center
+    text.Parent = frame
+    
+    spawn(function()
+        local lastPos = Vector3.new()
+        while true do
+            task.wait(0.5)
+            local char = LocalPlayer.Character
+            local speed = 0
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local currentPos = char.HumanoidRootPart.Position
+                speed = math.floor((currentPos - lastPos).Magnitude / 0.5)
+                lastPos = currentPos
+            end
+            text.Text = "MIXWARE | MM2 | " .. os.date("%H:%M:%S") .. " | SPEED: " .. speed .. " | KT471 & hokpry"
+        end
+    end)
+    
+    return screenGui
+end
+
+CreateWatermark()
 
 -- ==================== ESP ====================
 local function GetPlayerRole(player)
@@ -364,8 +417,137 @@ local function ToggleGunGrab(state)
     end
 end
 
--- ==================== COMBAT ====================
+-- ==================== KILL AURA (НОВАЯ ЛОГИКА) ====================
+local function GetClosestPlayerToCursor()
+    local closest = nil
+    local minAngle = math.huge
+    local mouse = UserInputService:GetMouseLocation()
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local root = player.Character.HumanoidRootPart
+            local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if onScreen then
+                local angle = (Vector2.new(screenPos.X, screenPos.Y) - mouse).Magnitude
+                if angle < minAngle then
+                    minAngle = angle
+                    closest = player
+                end
+            end
+        end
+    end
+    return closest
+end
+
 local function GetNearestPlayer(range)
+    local nearest, minDist = nil, range or math.huge
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = player
+            end
+        end
+    end
+    return nearest
+end
+
+local function SimulateMouseClick()
+    local mouse = UserInputService:GetMouseLocation()
+    UserInputService.InputBegan:Fire(mouse, Enum.UserInputType.MouseButton1)
+    task.wait(0.05)
+    UserInputService.InputEnded:Fire(mouse, Enum.UserInputType.MouseButton1)
+end
+
+local function KillAuraAction()
+    if KillAuraCooldown or not LocalPlayer.Character then return end
+    KillAuraCooldown = true
+    
+    local myRole = GetPlayerRole(LocalPlayer)
+    local target = nil
+    
+    if myRole == "sheriff" then
+        target = GetClosestPlayerToCursor()
+        if target then
+            local targetRole = GetPlayerRole(target)
+            if targetRole ~= "murderer" then
+                target = nil
+            end
+        end
+    elseif myRole == "murderer" then
+        target = GetNearestPlayer(KillAuraRange)
+        if target then
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local targetRoot = target.Character.HumanoidRootPart
+                local direction = (targetRoot.Position - LocalPlayer.Character.HumanoidRootPart.Position).Unit
+                local behindPos = targetRoot.Position - direction * 3
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(behindPos, targetRoot.Position)
+                task.wait(0.05)
+            end
+        end
+    else
+        KillAuraCooldown = false
+        return
+    end
+    
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local targetRoot = target.Character.HumanoidRootPart
+        local screenPos = Camera:WorldToViewportPoint(targetRoot.Position)
+        if screenPos.Z > 0 then
+            UserInputService:SetMouseLocation(screenPos.X, screenPos.Y)
+            task.wait(0.05)
+            SimulateMouseClick()
+            Rayfield:Notify({
+                Title = "Kill Aura",
+                Content = "Удар по " .. target.Name,
+                Duration = 1,
+                Image = "swords"
+            })
+        end
+    end
+    
+    KillAuraCooldown = false
+end
+
+local function ToggleKillAura(state)
+    KillAuraEnabled = state
+    
+    if state then
+        if KillAuraConnection then KillAuraConnection:Disconnect() end
+        
+        KillAuraConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not KillAuraEnabled then return end
+            
+            local keyPressed = false
+            
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                local key = input.KeyCode
+                if KillAuraKey == "Q" and key == Enum.KeyCode.Q then
+                    keyPressed = true
+                elseif KillAuraKey == "Y" and key == Enum.KeyCode.Y then
+                    keyPressed = true
+                end
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                keyPressed = true
+            end
+            
+            if keyPressed then
+                task.spawn(KillAuraAction)
+            end
+        end)
+    else
+        if KillAuraConnection then
+            KillAuraConnection:Disconnect()
+            KillAuraConnection = nil
+        end
+    end
+end
+
+-- ==================== COMBAT ====================
+local function GetNearestPlayerForFarm(range)
     local nearest, minDist = nil, range or math.huge
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
     for _, player in ipairs(Players:GetPlayers()) do
@@ -379,20 +561,9 @@ end
 
 local function AutoFarmLoop() while AutoFarmEnabled do task.wait(0.1) pcall(function()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    local t = GetNearestPlayer(50)
+    local t = GetNearestPlayerForFarm(50)
     if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
         LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
-    end
-end) end end
-
-local function KillAuraLoop() while KillAuraEnabled do task.wait(0.05) pcall(function()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            if (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude <= KillAuraRange then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame
-            end
-        end
     end
 end) end end
 
@@ -428,8 +599,42 @@ local GunTab = Window:CreateTab("Gun Grab", "target")
 
 MainTab:CreateSection("Combat")
 MainTab:CreateToggle({ Name = "Auto Farm", CurrentValue = false, Callback = function(s) AutoFarmEnabled = s; if s then task.spawn(AutoFarmLoop) end end })
-MainTab:CreateToggle({ Name = "Kill Aura", CurrentValue = false, Callback = function(s) KillAuraEnabled = s; if s then task.spawn(KillAuraLoop) end end })
-MainTab:CreateSlider({ Name = "Kill Aura Range", Range = {5,50}, Increment = 1, Suffix = "studs", CurrentValue = 15, Callback = function(v) KillAuraRange = v end })
+
+MainTab:CreateSection("Kill Aura (NEW)")
+MainTab:CreateToggle({ Name = "Kill Aura", CurrentValue = false, Callback = ToggleKillAura })
+MainTab:CreateSlider({ Name = "Kill Aura Range (for Murderer)", Range = {5,50}, Increment = 1, Suffix = "studs", CurrentValue = 15, Callback = function(v) KillAuraRange = v end })
+
+local keyOptions = {"Q", "Y"}
+MainTab:CreateDropdown({
+    Name = "Activation Key",
+    Options = keyOptions,
+    CurrentOption = "Q",
+    Callback = function(option)
+        KillAuraKey = option
+        Rayfield:Notify({
+            Title = "Kill Aura",
+            Content = "Клавиша: " .. option,
+            Duration = 2,
+            Image = "key"
+        })
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Attack (Mobile)",
+    Callback = function()
+        if KillAuraEnabled then
+            task.spawn(KillAuraAction)
+        else
+            Rayfield:Notify({
+                Title = "Kill Aura",
+                Content = "Сначала включи Kill Aura!",
+                Duration = 2,
+                Image = "x"
+            })
+        end
+    end
+})
 
 MainTab:CreateSection("Character")
 MainTab:CreateToggle({ Name = "God Mode", CurrentValue = false, Callback = ToggleGodMode })
@@ -497,4 +702,4 @@ Players.PlayerAdded:Connect(function(p)
     if ESPEnabled then p.CharacterAdded:Connect(function() task.wait(0.5); CreateESP(p) end) end
 end)
 
-Rayfield:Notify({ Title = "MM2 Script", Content = "Loaded!", Duration = 3, Image = "skull" })
+Rayfield:Notify({ Title = "MIXWARE", Content = "MM2 Script Loaded!", Duration = 3, Image = "skull" })
