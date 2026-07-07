@@ -1,7 +1,3 @@
---[[
-    MM2 Script - Rayfield
-]]
-
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -126,7 +122,7 @@ local function KillAuraLoop()
         end)
     end
 end
--- God Mode
+
 local function ToggleGodMode(state)
     GodModeEnabled = state
     pcall(function()
