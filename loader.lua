@@ -11,7 +11,7 @@ local Window = Rayfield:CreateWindow({
     Name = "MIXWARE LOADER",
     Icon = "download",
     LoadingTitle = "MIXWARE LOADER",
-    LoadingSubtitle = "by KT471 & hokpry",
+    LoadingSubtitle = "by KT471 & Lmeron",
     Theme = "DarkBlue",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
@@ -26,11 +26,7 @@ local Window = Rayfield:CreateWindow({
         SaveKey = true,
         GrabKeyFromSite = false,
         Key = {
-            "mixware2026",
-            "kt471",
-            "hokpry",
-            "mixmm2ontop",
-            "admin123"
+            "mixwareontop"
         }
     }
 })
