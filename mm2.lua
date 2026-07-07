@@ -65,75 +65,89 @@ end
 
 CreateWatermark()
 
--- ==================== ЗАГРУЗКА ESP ====================
-local ESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/linemaster2/esp-library/main/library.lua"))();
-
-ESP.Enabled = false
-ESP.ShowBox = false
-ESP.ShowName = false
-ESP.ShowHealth = false
-ESP.ShowDistance = false
-ESP.ShowTracer = false
-ESP.ShowSkeletons = false
-ESP.Color = Color3.fromRGB(255, 255, 255)
-ESP.MaxDistance = 500
-ESP.ShowTeammates = false
-ESP.BoxType = "Corner Box Esp"
-
--- ==================== GUI ====================
-local Window = Rayfield:CreateWindow({
-    Name = "MIXWARE | MM2 Script",
-    Icon = "skull",
-    LoadingTitle = "MIXWARE Loading...",
-    LoadingSubtitle = "by KT471 & hokpry",
-    Theme = "DarkBlue",
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "mixware",
-        FileName = "config"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "",
-        RememberJoins = true
-    },
-    KeySystem = false,
-})
-
+-- ==================== ESP (ИНТЕГРИРОВАННАЯ) ====================
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local Camera = Workspace.CurrentCamera
-local TeleportService = game:GetService("TeleportService")
+local localPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local cache = {}
 
--- Variables
-local AutoFarmEnabled = false
-local KillAuraEnabled = false
-local GodModeEnabled = false
-local CoinFarmEnabled = false
-local KillAuraRange = 15
-local KillAuraKey = "Q"
-local WalkSpeed = 16
-local JumpPower = 50
-local NoclipEnabled = false
-local FlyEnabled = false
-local FlySpeed = 50
-local NoclipConnection = nil
-local FlyConnection = nil
-local FlingEnabled = false
-local FlingConnection = nil
-local FlingParts = {}
-local GunGrabEnabled = false
-local GunGrabConnection = nil
-local KillAuraConnection = nil
-local KillAuraCooldown = false
+local bones = {
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "LowerTorso"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"}
+}
 
--- ==================== ESP ====================
+-- Настройки ESP
+local ESP_SETTINGS = {
+    BoxOutlineColor = Color3.new(0, 0, 0),
+    BoxColor = Color3.new(1, 1, 1),
+    NameColor = Color3.new(1, 1, 1),
+    HealthOutlineColor = Color3.new(0, 0, 0),
+    HealthHighColor = Color3.new(0, 1, 0),
+    HealthLowColor = Color3.new(1, 0, 0),
+    CharSize = Vector2.new(4, 6),
+    Teamcheck = false,
+    WallCheck = false,
+    Enabled = false,
+    ShowBox = false,
+    BoxType = "2D",
+    ShowName = false,
+    ShowHealth = false,
+    ShowDistance = false,
+    ShowSkeletons = false,
+    ShowTracer = false,
+    TracerColor = Color3.new(1, 1, 1),
+    TracerThickness = 2,
+    SkeletonsColor = Color3.new(1, 1, 1),
+    TracerPosition = "Bottom",
+}
+
+-- Функции создания
+local function create(class, properties)
+    local drawing = Drawing.new(class)
+    for property, value in pairs(properties) do
+        drawing[property] = value
+    end
+    return drawing
+end
+
+-- Функция получения роли игрока (для MM2)
 local function GetPlayerRole(player)
+    if player == localPlayer then
+        if localPlayer.Character then
+            for _, item in ipairs(localPlayer.Character:GetChildren()) do
+                if item:IsA("Tool") then
+                    local name = item.Name:lower()
+                    if name:find("knife") then return "murderer" end
+                    if name:find("gun") or name:find("pistol") or name:find("revolver") then return "sheriff" end
+                end
+            end
+        end
+        if localPlayer.Backpack then
+            for _, item in ipairs(localPlayer.Backpack:GetChildren()) do
+                if item:IsA("Tool") then
+                    local name = item.Name:lower()
+                    if name:find("knife") then return "murderer" end
+                    if name:find("gun") or name:find("pistol") or name:find("revolver") then return "sheriff" end
+                end
+            end
+        end
+        return "innocent"
+    end
+    
+    -- Проверка других игроков
     local backpack = player:FindFirstChild("Backpack")
     if backpack then
         for _, item in ipairs(backpack:GetChildren()) do
@@ -162,44 +176,452 @@ local function GetRoleColor(role)
     return Color3.fromRGB(128, 128, 128)
 end
 
-local function UpdateESPColor(player)
-    if not player then return end
-    local role = GetPlayerRole(player)
-    local color = GetRoleColor(role)
-    ESP:SetColor(color)
+local function GetRoleName(role)
+    if role == "murderer" then return "🔪" end
+    if role == "sheriff" then return "⭐" end
+    return ""
 end
 
-local function ToggleESP(state)
-    ESP.Enabled = state
-    if state then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                UpdateESPColor(player)
+-- Создание ESP
+local function createEsp(player)
+    local esp = {
+        tracer = create("Line", {
+            Thickness = ESP_SETTINGS.TracerThickness,
+            Color = ESP_SETTINGS.TracerColor,
+            Transparency = 0.5
+        }),
+        boxOutline = create("Square", {
+            Color = ESP_SETTINGS.BoxOutlineColor,
+            Thickness = 3,
+            Filled = false
+        }),
+        box = create("Square", {
+            Color = ESP_SETTINGS.BoxColor,
+            Thickness = 1,
+            Filled = false
+        }),
+        name = create("Text", {
+            Color = ESP_SETTINGS.NameColor,
+            Outline = true,
+            Center = true,
+            Size = 13
+        }),
+        healthOutline = create("Line", {
+            Thickness = 3,
+            Color = ESP_SETTINGS.HealthOutlineColor
+        }),
+        health = create("Line", {
+            Thickness = 1
+        }),
+        distance = create("Text", {
+            Color = Color3.new(1, 1, 1),
+            Size = 12,
+            Outline = true,
+            Center = true
+        }),
+        roleText = create("Text", {
+            Color = Color3.new(1, 1, 1),
+            Size = 14,
+            Outline = true,
+            Center = true
+        }),
+        boxLines = {},
+    }
+
+    cache[player] = esp
+    cache[player]["skeletonlines"] = {}
+end
+
+local function isPlayerBehindWall(player)
+    local character = player.Character
+    if not character then return false end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    local ray = Ray.new(camera.CFrame.Position, (rootPart.Position - camera.CFrame.Position).Unit * (rootPart.Position - camera.CFrame.Position).Magnitude)
+    local hit, position = workspace:FindPartOnRayWithIgnoreList(ray, {localPlayer.Character, character})
+    return hit and hit:IsA("Part")
+end
+
+local function removeEsp(player)
+    local esp = cache[player]
+    if not esp then return end
+    for _, drawing in pairs(esp) do
+        if drawing and drawing.Remove then
+            pcall(function() drawing:Remove() end)
+        end
+    end
+    if esp.skeletonlines then
+        for _, lineData in ipairs(esp.skeletonlines) do
+            local skeletonLine = lineData[1]
+            if skeletonLine and skeletonLine.Remove then
+                pcall(function() skeletonLine:Remove() end)
             end
         end
     end
-    ESP.Toggle(state)
+    cache[player] = nil
+end
+
+local function updateEsp()
+    for player, esp in pairs(cache) do
+        local character = player.Character
+        if character and ESP_SETTINGS.Enabled then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            local head = character:FindFirstChild("Head")
+            local humanoid = character:FindFirstChild("Humanoid")
+            local isBehindWall = ESP_SETTINGS.WallCheck and isPlayerBehindWall(player)
+            local shouldShow = not isBehindWall and ESP_SETTINGS.Enabled
+            
+            if rootPart and head and humanoid and shouldShow then
+                local position, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+                if onScreen then
+                    local hrp2D = camera:WorldToViewportPoint(rootPart.Position)
+                    local charSize = (camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0)).Y - camera:WorldToViewportPoint(rootPart.Position + Vector3.new(0, 2.6, 0)).Y) / 2
+                    local boxSize = Vector2.new(math.floor(charSize * 1.8), math.floor(charSize * 1.9))
+                    local boxPosition = Vector2.new(math.floor(hrp2D.X - charSize * 1.8 / 2), math.floor(hrp2D.Y - charSize * 1.6 / 2))
+                    
+                    -- Роль игрока
+                    local role = GetPlayerRole(player)
+                    local roleColor = GetRoleColor(role)
+                    local roleName = GetRoleName(role)
+                    
+                    -- Имя
+                    if ESP_SETTINGS.ShowName and ESP_SETTINGS.Enabled then
+                        esp.name.Visible = true
+                        local displayName = player.Name
+                        if roleName ~= "" then
+                            displayName = displayName .. " " .. roleName
+                        end
+                        esp.name.Text = displayName
+                        esp.name.Position = Vector2.new(boxSize.X / 2 + boxPosition.X, boxPosition.Y - 16)
+                        esp.name.Color = role ~= "innocent" and roleColor or ESP_SETTINGS.NameColor
+                    else
+                        esp.name.Visible = false
+                    end
+                    
+                    -- Роль (под именем)
+                    if roleName ~= "" then
+                        esp.roleText.Visible = true
+                        esp.roleText.Text = roleName
+                        esp.roleText.Position = Vector2.new(boxSize.X / 2 + boxPosition.X, boxPosition.Y - 30)
+                        esp.roleText.Color = roleColor
+                    else
+                        esp.roleText.Visible = false
+                    end
+                    
+                    -- Бокс
+                    if ESP_SETTINGS.ShowBox and ESP_SETTINGS.Enabled then
+                        local boxColor = role ~= "innocent" and roleColor or ESP_SETTINGS.BoxColor
+                        
+                        if ESP_SETTINGS.BoxType == "2D" then
+                            esp.boxOutline.Size = boxSize
+                            esp.boxOutline.Position = boxPosition
+                            esp.box.Size = boxSize
+                            esp.box.Position = boxPosition
+                            esp.box.Color = boxColor
+                            esp.box.Visible = true
+                            esp.boxOutline.Visible = true
+                            for _, line in ipairs(esp.boxLines) do
+                                pcall(function() line:Remove() end)
+                            end
+                            esp.boxLines = {}
+                        elseif ESP_SETTINGS.BoxType == "Corner Box Esp" then
+                            local lineW = (boxSize.X / 5)
+                            local lineH = (boxSize.Y / 6)
+                            local lineT = 1
+                            
+                            if #esp.boxLines == 0 then
+                                for i = 1, 16 do
+                                    local boxLine = create("Line", {
+                                        Thickness = 1,
+                                        Color = boxColor,
+                                        Transparency = 1
+                                    })
+                                    esp.boxLines[#esp.boxLines + 1] = boxLine
+                                end
+                            end
+                            
+                            local boxLines = esp.boxLines
+                            
+                            -- Top left
+                            boxLines[1].From = Vector2.new(boxPosition.X - lineT, boxPosition.Y - lineT)
+                            boxLines[1].To = Vector2.new(boxPosition.X + lineW, boxPosition.Y - lineT)
+                            boxLines[2].From = Vector2.new(boxPosition.X - lineT, boxPosition.Y - lineT)
+                            boxLines[2].To = Vector2.new(boxPosition.X - lineT, boxPosition.Y + lineH)
+                            
+                            -- Top right
+                            boxLines[3].From = Vector2.new(boxPosition.X + boxSize.X - lineW, boxPosition.Y - lineT)
+                            boxLines[3].To = Vector2.new(boxPosition.X + boxSize.X + lineT, boxPosition.Y - lineT)
+                            boxLines[4].From = Vector2.new(boxPosition.X + boxSize.X + lineT, boxPosition.Y - lineT)
+                            boxLines[4].To = Vector2.new(boxPosition.X + boxSize.X + lineT, boxPosition.Y + lineH)
+                            
+                            -- Bottom left
+                            boxLines[5].From = Vector2.new(boxPosition.X - lineT, boxPosition.Y + boxSize.Y - lineH)
+                            boxLines[5].To = Vector2.new(boxPosition.X - lineT, boxPosition.Y + boxSize.Y + lineT)
+                            boxLines[6].From = Vector2.new(boxPosition.X - lineT, boxPosition.Y + boxSize.Y + lineT)
+                            boxLines[6].To = Vector2.new(boxPosition.X + lineW, boxPosition.Y + boxSize.Y + lineT)
+                            
+                            -- Bottom right
+                            boxLines[7].From = Vector2.new(boxPosition.X + boxSize.X - lineW, boxPosition.Y + boxSize.Y + lineT)
+                            boxLines[7].To = Vector2.new(boxPosition.X + boxSize.X + lineT, boxPosition.Y + boxSize.Y + lineT)
+                            boxLines[8].From = Vector2.new(boxPosition.X + boxSize.X + lineT, boxPosition.Y + boxSize.Y - lineH)
+                            boxLines[8].To = Vector2.new(boxPosition.X + boxSize.X + lineT, boxPosition.Y + boxSize.Y + lineT)
+                            
+                            -- Inline
+                            for i = 9, 16 do
+                                boxLines[i].Thickness = 2
+                                boxLines[i].Color = ESP_SETTINGS.BoxOutlineColor
+                                boxLines[i].Transparency = 1
+                            end
+                            
+                            boxLines[9].From = Vector2.new(boxPosition.X, boxPosition.Y)
+                            boxLines[9].To = Vector2.new(boxPosition.X, boxPosition.Y + lineH)
+                            boxLines[10].From = Vector2.new(boxPosition.X, boxPosition.Y)
+                            boxLines[10].To = Vector2.new(boxPosition.X + lineW, boxPosition.Y)
+                            boxLines[11].From = Vector2.new(boxPosition.X + boxSize.X - lineW, boxPosition.Y)
+                            boxLines[11].To = Vector2.new(boxPosition.X + boxSize.X, boxPosition.Y)
+                            boxLines[12].From = Vector2.new(boxPosition.X + boxSize.X, boxPosition.Y)
+                            boxLines[12].To = Vector2.new(boxPosition.X + boxSize.X, boxPosition.Y + lineH)
+                            boxLines[13].From = Vector2.new(boxPosition.X, boxPosition.Y + boxSize.Y - lineH)
+                            boxLines[13].To = Vector2.new(boxPosition.X, boxPosition.Y + boxSize.Y)
+                            boxLines[14].From = Vector2.new(boxPosition.X, boxPosition.Y + boxSize.Y)
+                            boxLines[14].To = Vector2.new(boxPosition.X + lineW, boxPosition.Y + boxSize.Y)
+                            boxLines[15].From = Vector2.new(boxPosition.X + boxSize.X - lineW, boxPosition.Y + boxSize.Y)
+                            boxLines[15].To = Vector2.new(boxPosition.X + boxSize.X, boxPosition.Y + boxSize.Y)
+                            boxLines[16].From = Vector2.new(boxPosition.X + boxSize.X, boxPosition.Y + boxSize.Y - lineH)
+                            boxLines[16].To = Vector2.new(boxPosition.X + boxSize.X, boxPosition.Y + boxSize.Y)
+                            
+                            for _, line in ipairs(boxLines) do
+                                line.Visible = true
+                                line.Color = boxColor
+                            end
+                            esp.box.Visible = false
+                            esp.boxOutline.Visible = false
+                        end
+                    else
+                        esp.box.Visible = false
+                        esp.boxOutline.Visible = false
+                        for _, line in ipairs(esp.boxLines) do
+                            pcall(function() line:Remove() end)
+                        end
+                        esp.boxLines = {}
+                    end
+                    
+                    -- Здоровье
+                    if ESP_SETTINGS.ShowHealth and ESP_SETTINGS.Enabled then
+                        esp.healthOutline.Visible = true
+                        esp.health.Visible = true
+                        local healthPercentage = humanoid.Health / humanoid.MaxHealth
+                        esp.healthOutline.From = Vector2.new(boxPosition.X - 6, boxPosition.Y + boxSize.Y)
+                        esp.healthOutline.To = Vector2.new(esp.healthOutline.From.X, esp.healthOutline.From.Y - boxSize.Y)
+                        esp.health.From = Vector2.new((boxPosition.X - 5), boxPosition.Y + boxSize.Y)
+                        esp.health.To = Vector2.new(esp.health.From.X, esp.health.From.Y - healthPercentage * boxSize.Y)
+                        esp.health.Color = ESP_SETTINGS.HealthLowColor:Lerp(ESP_SETTINGS.HealthHighColor, healthPercentage)
+                    else
+                        esp.healthOutline.Visible = false
+                        esp.health.Visible = false
+                    end
+                    
+                    -- Дистанция
+                    if ESP_SETTINGS.ShowDistance and ESP_SETTINGS.Enabled then
+                        local distance = (camera.CFrame.p - rootPart.Position).Magnitude
+                        esp.distance.Text = string.format("%.1f studs", distance)
+                        esp.distance.Position = Vector2.new(boxPosition.X + boxSize.X / 2, boxPosition.Y + boxSize.Y + 5)
+                        esp.distance.Visible = true
+                    else
+                        esp.distance.Visible = false
+                    end
+                    
+                    -- Скелет
+                    if ESP_SETTINGS.ShowSkeletons and ESP_SETTINGS.Enabled then
+                        if #esp["skeletonlines"] == 0 then
+                            for _, bonePair in ipairs(bones) do
+                                local parentBone, childBone = bonePair[1], bonePair[2]
+                                if player.Character and player.Character[parentBone] and player.Character[childBone] then
+                                    local skeletonLine = create("Line", {
+                                        Thickness = 1,
+                                        Color = ESP_SETTINGS.SkeletonsColor,
+                                        Transparency = 1
+                                    })
+                                    esp["skeletonlines"][#esp["skeletonlines"] + 1] = {skeletonLine, parentBone, childBone}
+                                end
+                            end
+                        end
+                        
+                        for _, lineData in ipairs(esp["skeletonlines"]) do
+                            local skeletonLine = lineData[1]
+                            local parentBone, childBone = lineData[2], lineData[3]
+                            
+                            if player.Character and player.Character[parentBone] and player.Character[childBone] then
+                                local parentPosition = camera:WorldToViewportPoint(player.Character[parentBone].Position)
+                                local childPosition = camera:WorldToViewportPoint(player.Character[childBone].Position)
+                                
+                                skeletonLine.From = Vector2.new(parentPosition.X, parentPosition.Y)
+                                skeletonLine.To = Vector2.new(childPosition.X, childPosition.Y)
+                                skeletonLine.Color = ESP_SETTINGS.SkeletonsColor
+                                skeletonLine.Visible = true
+                            else
+                                skeletonLine.Visible = false
+                            end
+                        end
+                    else
+                        for _, lineData in ipairs(esp["skeletonlines"]) do
+                            local skeletonLine = lineData[1]
+                            skeletonLine.Visible = false
+                        end
+                    end
+                    
+                    -- Трейсер
+                    if ESP_SETTINGS.ShowTracer and ESP_SETTINGS.Enabled then
+                        local tracerY
+                        if ESP_SETTINGS.TracerPosition == "Top" then
+                            tracerY = 0
+                        elseif ESP_SETTINGS.TracerPosition == "Middle" then
+                            tracerY = camera.ViewportSize.Y / 2
+                        else
+                            tracerY = camera.ViewportSize.Y
+                        end
+                        esp.tracer.Visible = true
+                        esp.tracer.From = Vector2.new(camera.ViewportSize.X / 2, tracerY)
+                        esp.tracer.To = Vector2.new(hrp2D.X, hrp2D.Y)
+                        esp.tracer.Color = role ~= "innocent" and roleColor or ESP_SETTINGS.TracerColor
+                    else
+                        esp.tracer.Visible = false
+                    end
+                else
+                    -- Скрываем всё
+                    for _, drawing in pairs(esp) do
+                        if drawing and drawing.Visible ~= nil then
+                            drawing.Visible = false
+                        end
+                    end
+                    for _, lineData in ipairs(esp["skeletonlines"]) do
+                        local skeletonLine = lineData[1]
+                        if skeletonLine then
+                            skeletonLine.Visible = false
+                        end
+                    end
+                    for _, line in ipairs(esp.boxLines) do
+                        pcall(function() line:Remove() end)
+                    end
+                    esp.boxLines = {}
+                end
+            else
+                -- Скрываем всё
+                for _, drawing in pairs(esp) do
+                    if drawing and drawing.Visible ~= nil then
+                        drawing.Visible = false
+                    end
+                end
+                for _, lineData in ipairs(esp["skeletonlines"]) do
+                    local skeletonLine = lineData[1]
+                    if skeletonLine then
+                        skeletonLine.Visible = false
+                    end
+                end
+                for _, line in ipairs(esp.boxLines) do
+                    pcall(function() line:Remove() end)
+                end
+                esp.boxLines = {}
+            end
+        else
+            -- Скрываем всё
+            for _, drawing in pairs(esp) do
+                if drawing and drawing.Visible ~= nil then
+                    drawing.Visible = false
+                end
+            end
+            for _, lineData in ipairs(esp["skeletonlines"]) do
+                local skeletonLine = lineData[1]
+                if skeletonLine then
+                    skeletonLine.Visible = false
+                end
+            end
+            for _, line in ipairs(esp.boxLines) do
+                pcall(function() line:Remove() end)
+            end
+            esp.boxLines = {}
+        end
+    end
+end
+
+-- Инициализация ESP
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= localPlayer then
+        createEsp(player)
+    end
 end
 
 Players.PlayerAdded:Connect(function(player)
-    if ESP.Enabled then
-        player.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            if ESP.Enabled then
-                UpdateESPColor(player)
-            end
-        end)
+    if player ~= localPlayer then
+        createEsp(player)
     end
 end)
 
--- ==================== NOCLIP ====================
+Players.PlayerRemoving:Connect(function(player)
+    removeEsp(player)
+end)
+
+RunService.RenderStepped:Connect(updateEsp)
+
+-- ==================== ОСТАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+
+local AutoFarmEnabled = false
+local KillAuraEnabled = false
+local GodModeEnabled = false
+local CoinFarmEnabled = false
+local KillAuraRange = 15
+local KillAuraKey = "Q"
+local WalkSpeed = 16
+local JumpPower = 50
+local NoclipEnabled = false
+local FlyEnabled = false
+local FlySpeed = 50
+local NoclipConnection = nil
+local FlyConnection = nil
+local FlingEnabled = false
+local FlingConnection = nil
+local FlingParts = {}
+local GunGrabEnabled = false
+local GunGrabConnection = nil
+local KillAuraConnection = nil
+local KillAuraCooldown = false
+
+-- ==================== GUI ====================
+local Window = Rayfield:CreateWindow({
+    Name = "MIXWARE | MM2 Script",
+    Icon = "skull",
+    LoadingTitle = "MIXWARE Loading...",
+    LoadingSubtitle = "by KT471 & hokpry",
+    Theme = "DarkBlue",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = { Enabled = true, FolderName = "mixware", FileName = "config" },
+    Discord = { Enabled = false, Invite = "", RememberJoins = true },
+    KeySystem = false,
+})
+
+-- ==================== ТАБЫ ====================
+local MainTab = Window:CreateTab("Main", "swords")
+local VisualsTab = Window:CreateTab("Visuals", "eye")
+local MovementTab = Window:CreateTab("Movement", "plane")
+local TeleportTab = Window:CreateTab("Teleport", "map-pin")
+local FarmTab = Window:CreateTab("Farm", "coins")
+local MiscTab = Window:CreateTab("Misc", "settings")
+local FlingTab = Window:CreateTab("Fling", "zap")
+local GunTab = Window:CreateTab("Gun Grab", "target")
+local SettingsTab = Window:CreateTab("Settings", "settings")
+
+-- ==================== ФУНКЦИИ (NOCLIP, FLY, FLING, GUN GRAB, KILL AURA) ====================
 local function ToggleNoclip(state)
     NoclipEnabled = state
     if state then
         if NoclipConnection then NoclipConnection:Disconnect() end
         NoclipConnection = RunService.Stepped:Connect(function()
-            if LocalPlayer.Character then
-                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if localPlayer.Character then
+                for _, part in ipairs(localPlayer.Character:GetDescendants()) do
                     if part:IsA("BasePart") and part.CanCollide then
                         part.CanCollide = false
                     end
@@ -211,8 +633,8 @@ local function ToggleNoclip(state)
             NoclipConnection:Disconnect()
             NoclipConnection = nil
         end
-        if LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+        if localPlayer.Character then
+            for _, part in ipairs(localPlayer.Character:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = true
                 end
@@ -221,21 +643,20 @@ local function ToggleNoclip(state)
     end
 end
 
--- ==================== FLY ====================
 local function ToggleFly(state)
     FlyEnabled = state
     if state then
-        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
         local root = character:WaitForChild("HumanoidRootPart")
         local hum = character:WaitForChild("Humanoid")
         hum.PlatformStand = true
         FlyConnection = RunService.RenderStepped:Connect(function()
             if root then
                 local dir = Vector3.new()
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += Camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= Camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= Camera.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += Camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += camera.CFrame.RightVector end
                 if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
                 if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
                 if dir.Magnitude > 0 then dir = dir.Unit * FlySpeed end
@@ -244,22 +665,21 @@ local function ToggleFly(state)
         end)
     else
         if FlyConnection then FlyConnection:Disconnect(); FlyConnection = nil end
-        if LocalPlayer.Character then
-            local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if localPlayer.Character then
+            local hum = localPlayer.Character:FindFirstChild("Humanoid")
             if hum then hum.PlatformStand = false end
         end
     end
 end
 
--- ==================== FLING ====================
 local function ToggleFling(state)
     FlingEnabled = state
     
     if state then
-        if not LocalPlayer.Character then return end
+        if not localPlayer.Character then return end
         
         FlingParts = {}
-        for _, child in pairs(LocalPlayer.Character:GetDescendants()) do
+        for _, child in pairs(localPlayer.Character:GetDescendants()) do
             if child:IsA("BasePart") then
                 table.insert(FlingParts, {
                     Part = child,
@@ -276,20 +696,20 @@ local function ToggleFling(state)
         
         local bambam = Instance.new("BodyAngularVelocity")
         bambam.Name = "Fling_Body"
-        bambam.Parent = LocalPlayer.Character.HumanoidRootPart
+        bambam.Parent = localPlayer.Character.HumanoidRootPart
         bambam.AngularVelocity = Vector3.new(0, 99999, 0)
         bambam.MaxTorque = Vector3.new(0, math.huge, 0)
         bambam.P = math.huge
         
-        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        local hum = localPlayer.Character:FindFirstChild("Humanoid")
         if hum then
             hum.PlatformStand = false
             hum.AutoRotate = false
         end
         
         FlingConnection = RunService.RenderStepped:Connect(function()
-            if FlingEnabled and LocalPlayer.Character then
-                local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if FlingEnabled and localPlayer.Character then
+                local root = localPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if root then
                     local bambam = root:FindFirstChild("Fling_Body")
                     if bambam then
@@ -310,8 +730,8 @@ local function ToggleFling(state)
             FlingConnection = nil
         end
         
-        if LocalPlayer.Character then
-            local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if localPlayer.Character then
+            local root = localPlayer.Character:FindFirstChild("HumanoidRootPart")
             if root then
                 local bambam = root:FindFirstChild("Fling_Body")
                 if bambam then bambam:Destroy() end
@@ -327,7 +747,7 @@ local function ToggleFling(state)
             end
             FlingParts = {}
             
-            local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+            local hum = localPlayer.Character:FindFirstChild("Humanoid")
             if hum then
                 hum.PlatformStand = false
                 hum.AutoRotate = true
@@ -338,20 +758,19 @@ local function ToggleFling(state)
     end
 end
 
--- ==================== GUN GRAB ====================
 local function ToggleGunGrab(state)
     GunGrabEnabled = state
     if state then
         GunGrabConnection = RunService.RenderStepped:Connect(function()
-            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+            if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
             for _, model in ipairs(Workspace:GetChildren()) do
                 if model.Name == "GunDrop" then
                     local rootPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
                     if rootPart then
                         local pos = rootPart.Position
-                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
+                        localPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
                         task.wait(0.5)
-                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 0, 0))
+                        localPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 0, 0))
                         break
                     end
                 end
@@ -365,6 +784,45 @@ local function ToggleGunGrab(state)
     end
 end
 
+local function GetNearestPlayerForFarm(range)
+    local nearest, minDist = nil, range or math.huge
+    if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if dist < minDist then minDist = dist; nearest = player end
+        end
+    end
+    return nearest
+end
+
+local function AutoFarmLoop() while AutoFarmEnabled do task.wait(0.1) pcall(function()
+    if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local t = GetNearestPlayerForFarm(50)
+    if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+        localPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
+    end
+end) end end
+
+local function ToggleGodMode(state)
+    GodModeEnabled = state
+    pcall(function()
+        if not localPlayer.Character then return end
+        local hum = localPlayer.Character:FindFirstChild("Humanoid")
+        if hum then hum.MaxHealth = state and math.huge or 100; hum.Health = state and math.huge or 100 end
+    end)
+end
+
+local function CoinFarmLoop() while CoinFarmEnabled do task.wait(0.1) pcall(function()
+    if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if v.Name == "Coin" or v.Name == "CoinContainer" then
+            local coin = v:IsA("BasePart") and v or v:FindFirstChildWhichIsA("BasePart")
+            if coin then firetouchinterest(localPlayer.Character.HumanoidRootPart, coin, 0); firetouchinterest(localPlayer.Character.HumanoidRootPart, coin, 1) end
+        end
+    end
+end) end end
+
 -- ==================== KILL AURA ====================
 local function GetClosestPlayerToCursor()
     local closest = nil
@@ -372,9 +830,9 @@ local function GetClosestPlayerToCursor()
     local mouse = UserInputService:GetMouseLocation()
     
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local root = player.Character.HumanoidRootPart
-            local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            local screenPos, onScreen = camera:WorldToViewportPoint(root.Position)
             if onScreen then
                 local angle = (Vector2.new(screenPos.X, screenPos.Y) - mouse).Magnitude
                 if angle < minAngle then
@@ -389,10 +847,10 @@ end
 
 local function GetNearestPlayer(range)
     local nearest, minDist = nil, range or math.huge
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
+    if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
             if dist < minDist then
                 minDist = dist
                 nearest = player
@@ -410,10 +868,10 @@ local function SimulateMouseClick()
 end
 
 local function KillAuraAction()
-    if KillAuraCooldown or not LocalPlayer.Character then return end
+    if KillAuraCooldown or not localPlayer.Character then return end
     KillAuraCooldown = true
     
-    local myRole = GetPlayerRole(LocalPlayer)
+    local myRole = GetPlayerRole(localPlayer)
     local target = nil
     
     if myRole == "sheriff" then
@@ -429,9 +887,9 @@ local function KillAuraAction()
         if target then
             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                 local targetRoot = target.Character.HumanoidRootPart
-                local direction = (targetRoot.Position - LocalPlayer.Character.HumanoidRootPart.Position).Unit
+                local direction = (targetRoot.Position - localPlayer.Character.HumanoidRootPart.Position).Unit
                 local behindPos = targetRoot.Position - direction * 3
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(behindPos, targetRoot.Position)
+                localPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(behindPos, targetRoot.Position)
                 task.wait(0.05)
             end
         end
@@ -442,7 +900,7 @@ local function KillAuraAction()
     
     if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
         local targetRoot = target.Character.HumanoidRootPart
-        local screenPos = Camera:WorldToViewportPoint(targetRoot.Position)
+        local screenPos = camera:WorldToViewportPoint(targetRoot.Position)
         if screenPos.Z > 0 then
             UserInputService:SetMouseLocation(screenPos.X, screenPos.Y)
             task.wait(0.05)
@@ -494,58 +952,6 @@ local function ToggleKillAura(state)
     end
 end
 
--- ==================== COMBAT ====================
-local function GetNearestPlayerForFarm(range)
-    local nearest, minDist = nil, range or math.huge
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return nil end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-            if dist < minDist then minDist = dist; nearest = player end
-        end
-    end
-    return nearest
-end
-
-local function AutoFarmLoop() while AutoFarmEnabled do task.wait(0.1) pcall(function()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    local t = GetNearestPlayerForFarm(50)
-    if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
-    end
-end) end end
-
-local function ToggleGodMode(state)
-    GodModeEnabled = state
-    pcall(function()
-        if not LocalPlayer.Character then return end
-        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-        if hum then hum.MaxHealth = state and math.huge or 100; hum.Health = state and math.huge or 100 end
-    end)
-end
-
--- ==================== COIN FARM ====================
-local function CoinFarmLoop() while CoinFarmEnabled do task.wait(0.1) pcall(function()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    for _, v in ipairs(Workspace:GetDescendants()) do
-        if v.Name == "Coin" or v.Name == "CoinContainer" then
-            local coin = v:IsA("BasePart") and v or v:FindFirstChildWhichIsA("BasePart")
-            if coin then firetouchinterest(LocalPlayer.Character.HumanoidRootPart, coin, 0); firetouchinterest(LocalPlayer.Character.HumanoidRootPart, coin, 1) end
-        end
-    end
-end) end end
-
--- ==================== GUI ====================
-local MainTab = Window:CreateTab("Main", "swords")
-local VisualsTab = Window:CreateTab("Visuals", "eye")
-local MovementTab = Window:CreateTab("Movement", "plane")
-local TeleportTab = Window:CreateTab("Teleport", "map-pin")
-local FarmTab = Window:CreateTab("Farm", "coins")
-local MiscTab = Window:CreateTab("Misc", "settings")
-local FlingTab = Window:CreateTab("Fling", "zap")
-local GunTab = Window:CreateTab("Gun Grab", "target")
-local SettingsTab = Window:CreateTab("Settings", "settings")
-
 -- ==================== MAIN TAB ====================
 MainTab:CreateSection("Combat")
 MainTab:CreateToggle({ Name = "Auto Farm", CurrentValue = false, Callback = function(s) AutoFarmEnabled = s; if s then task.spawn(AutoFarmLoop) end end })
@@ -588,41 +994,92 @@ MainTab:CreateButton({
 
 MainTab:CreateSection("Character")
 MainTab:CreateToggle({ Name = "God Mode", CurrentValue = false, Callback = ToggleGodMode })
-MainTab:CreateSlider({ Name = "Walk Speed", Range = {16,200}, Increment = 1, CurrentValue = 16, Callback = function(v) WalkSpeed = v; if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = v end end })
-MainTab:CreateSlider({ Name = "Jump Power", Range = {50,300}, Increment = 1, CurrentValue = 50, Callback = function(v) JumpPower = v; if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.JumpPower = v end end })
+MainTab:CreateSlider({ Name = "Walk Speed", Range = {16,200}, Increment = 1, CurrentValue = 16, Callback = function(v) WalkSpeed = v; if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.WalkSpeed = v end end })
+MainTab:CreateSlider({ Name = "Jump Power", Range = {50,300}, Increment = 1, CurrentValue = 50, Callback = function(v) JumpPower = v; if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.JumpPower = v end end })
 
 -- ==================== VISUALS TAB ====================
 VisualsTab:CreateSection("ESP Settings")
-VisualsTab:CreateToggle({ Name = "ESP Master", CurrentValue = false, Callback = ToggleESP })
+VisualsTab:CreateToggle({ Name = "ESP Master", CurrentValue = false, Callback = function(s) ESP_SETTINGS.Enabled = s end })
 
 VisualsTab:CreateSection("ESP Types")
-VisualsTab:CreateToggle({ Name = "Box ESP", CurrentValue = false, Callback = function(s) ESP.ShowBox = s end })
-VisualsTab:CreateToggle({ Name = "Name ESP", CurrentValue = false, Callback = function(s) ESP.ShowName = s end })
-VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Callback = function(s) ESP.ShowHealth = s end })
-VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = false, Callback = function(s) ESP.ShowDistance = s end })
-VisualsTab:CreateToggle({ Name = "Tracer", CurrentValue = false, Callback = function(s) ESP.ShowTracer = s end })
+VisualsTab:CreateToggle({ Name = "Box ESP", CurrentValue = false, Callback = function(s) ESP_SETTINGS.ShowBox = s end })
+
+VisualsTab:CreateDropdown({
+    Name = "Box Type",
+    Options = {"2D", "Corner Box Esp"},
+    CurrentOption = "2D",
+    Callback = function(option)
+        ESP_SETTINGS.BoxType = option
+    end
+})
+
+VisualsTab:CreateToggle({ Name = "Name ESP", CurrentValue = false, Callback = function(s) ESP_SETTINGS.ShowName = s end })
+VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Callback = function(s) ESP_SETTINGS.ShowHealth = s end })
+VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = false, Callback = function(s) ESP_SETTINGS.ShowDistance = s end })
+VisualsTab:CreateToggle({ Name = "Tracer", CurrentValue = false, Callback = function(s) ESP_SETTINGS.ShowTracer = s end })
+
+VisualsTab:CreateDropdown({
+    Name = "Tracer Position",
+    Options = {"Bottom", "Middle", "Top"},
+    CurrentOption = "Bottom",
+    Callback = function(option)
+        ESP_SETTINGS.TracerPosition = option
+    end
+})
+
+VisualsTab:CreateToggle({ Name = "Skeletons", CurrentValue = false, Callback = function(s) ESP_SETTINGS.ShowSkeletons = s end })
 
 VisualsTab:CreateSection("ESP Colors")
 VisualsTab:CreateColorPicker({
-    Name = "ESP Color",
+    Name = "Box Color",
     Color = Color3.fromRGB(255, 255, 255),
-    Flag = "ESPColor",
-    Callback = function(Color)
-        ESP.Color = Color
-        ESP:SetColor(Color)
+    Callback = function(color)
+        ESP_SETTINGS.BoxColor = color
+    end
+})
+
+VisualsTab:CreateColorPicker({
+    Name = "Name Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        ESP_SETTINGS.NameColor = color
+    end
+})
+
+VisualsTab:CreateColorPicker({
+    Name = "Tracer Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        ESP_SETTINGS.TracerColor = color
+    end
+})
+
+VisualsTab:CreateColorPicker({
+    Name = "Skeleton Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        ESP_SETTINGS.SkeletonsColor = color
     end
 })
 
 VisualsTab:CreateSlider({
-    Name = "ESP Distance",
-    Range = {50, 1000},
-    Increment = 50,
-    Suffix = "studs",
-    CurrentValue = 500,
+    Name = "Tracer Thickness",
+    Range = {1, 5},
+    Increment = 1,
+    CurrentValue = 2,
     Callback = function(v)
-        ESP.MaxDistance = v
+        ESP_SETTINGS.TracerThickness = v
+        for _, esp in pairs(cache) do
+            if esp.tracer then
+                esp.tracer.Thickness = v
+            end
+        end
     end
 })
+
+VisualsTab:CreateSection("Advanced")
+VisualsTab:CreateToggle({ Name = "Team Check", CurrentValue = false, Callback = function(s) ESP_SETTINGS.Teamcheck = s end })
+VisualsTab:CreateToggle({ Name = "Wall Check", CurrentValue = false, Callback = function(s) ESP_SETTINGS.WallCheck = s end })
 
 -- ==================== MOVEMENT TAB ====================
 MovementTab:CreateSection("Movement")
@@ -640,42 +1097,78 @@ GunTab:CreateToggle({ Name = "Grab Gun on Drop", CurrentValue = false, Callback 
 
 -- ==================== TELEPORT TAB ====================
 TeleportTab:CreateSection("Teleport to Player")
-local playerList = {}
-for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(playerList, p.Name) end end
-local tpDropdown = TeleportTab:CreateDropdown({ Name = "Select Player", Options = playerList, CurrentOption = playerList[1] or "", Callback = function() end })
-TeleportTab:CreateButton({ Name = "Teleport", Callback = function()
-    local name = tpDropdown.CurrentOption
-    if name and name ~= "" then
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p.Name == name and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    LocalPlayer.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame
-                    Rayfield:Notify({ Title = "Teleport", Content = "Teleported to " .. name, Duration = 2, Image = "map-pin" })
-                    return
+
+local function GetPlayerList()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= localPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    return names
+end
+
+local tpDropdown = TeleportTab:CreateDropdown({
+    Name = "Select Player",
+    Options = GetPlayerList(),
+    CurrentOption = "",
+    Callback = function() end
+})
+
+TeleportTab:CreateButton({
+    Name = "Teleport",
+    Callback = function()
+        local name = tpDropdown.CurrentOption
+        if name and name ~= "" then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Name == name and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        localPlayer.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame
+                        Rayfield:Notify({
+                            Title = "Teleport",
+                            Content = "Teleported to " .. name,
+                            Duration = 2,
+                            Image = "map-pin"
+                        })
+                        return
+                    end
                 end
             end
+            Rayfield:Notify({
+                Title = "Teleport",
+                Content = "Player not found!",
+                Duration = 2,
+                Image = "x"
+            })
         end
-        Rayfield:Notify({ Title = "Teleport", Content = "Player not found!", Duration = 2, Image = "x" })
     end
-end })
-TeleportTab:CreateButton({ Name = "Refresh", Callback = function()
-    local names = {}
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(names, p.Name) end end
-    tpDropdown:Refresh(names)
-end })
+})
+
+TeleportTab:CreateButton({
+    Name = "Refresh Players",
+    Callback = function()
+        local newList = GetPlayerList()
+        tpDropdown:Refresh(newList)
+        Rayfield:Notify({
+            Title = "Teleport",
+            Content = "Список игроков обновлён",
+            Duration = 2,
+            Image = "refresh"
+        })
+    end
+})
 
 -- ==================== FARM TAB ====================
 FarmTab:CreateToggle({ Name = "Auto Coin Farm", CurrentValue = false, Callback = function(s) CoinFarmEnabled = s; if s then task.spawn(CoinFarmLoop) end end })
 
 -- ==================== MISC TAB ====================
-MiscTab:CreateButton({ Name = "Rejoin", Callback = function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end })
-MiscTab:CreateButton({ Name = "Server Hop", Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end })
+MiscTab:CreateButton({ Name = "Rejoin", Callback = function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer) end })
+MiscTab:CreateButton({ Name = "Server Hop", Callback = function() TeleportService:Teleport(game.PlaceId, localPlayer) end })
 MiscTab:CreateButton({ Name = "Destroy GUI", Callback = function() Window:Destroy() end })
 
--- ==================== SETTINGS TAB (НАСТРОЙКИ RAYFIELD) ====================
-SettingsTab:CreateSection("Внешний вид меню")
+-- ==================== SETTINGS TAB ====================
+SettingsTab:CreateSection("Внешний вид")
 
--- Выбор темы
 local themes = {"DarkBlue", "Dark", "Light", "Amber", "Midnight", "Ocean", "Crimson", "Purple", "Green", "Galaxy"}
 SettingsTab:CreateDropdown({
     Name = "Тема меню",
@@ -692,67 +1185,8 @@ SettingsTab:CreateDropdown({
     end
 })
 
-SettingsTab:CreateSection("Прозрачность меню")
-
-local TransparencySlider = SettingsTab:CreateSlider({
-    Name = "Прозрачность фона",
-    Range = {0, 100},
-    Increment = 5,
-    Suffix = "%",
-    CurrentValue = 0,
-    Callback = function(v)
-        local transparency = v / 100
-        -- Применяем прозрачность к основным элементам Rayfield
-        pcall(function()
-            local mainGui = Rayfield:GetGui()
-            if mainGui then
-                for _, child in ipairs(mainGui:GetDescendants()) do
-                    if child:IsA("Frame") or child:IsA("ImageLabel") then
-                        child.BackgroundTransparency = transparency
-                    end
-                end
-            end
-        end)
-        Rayfield:Notify({
-            Title = "Прозрачность",
-            Content = "Установлена: " .. v .. "%",
-            Duration = 1,
-            Image = "eye"
-        })
-    end
-})
-
-SettingsTab:CreateSection("Управление")
-
-SettingsTab:CreateButton({
-    Name = "👁️ Скрыть меню (K)",
-    Callback = function()
-        Rayfield:SetVisibility(false)
-        Rayfield:Notify({
-            Title = "Меню",
-            Content = "Скрыто. Нажми K чтобы показать",
-            Duration = 2,
-            Image = "eye"
-        })
-    end
-})
-
-SettingsTab:CreateButton({
-    Name = "👁️ Показать меню",
-    Callback = function()
-        Rayfield:SetVisibility(true)
-        Rayfield:Notify({
-            Title = "Меню",
-            Content = "Показано",
-            Duration = 2,
-            Image = "eye"
-        })
-    end
-})
-
 SettingsTab:CreateSection("Конфигурации")
 
--- Сохранение конфига
 SettingsTab:CreateButton({
     Name = "💾 Сохранить конфигурацию",
     Callback = function()
@@ -766,7 +1200,6 @@ SettingsTab:CreateButton({
     end
 })
 
--- Загрузка конфига
 SettingsTab:CreateButton({
     Name = "📂 Загрузить конфигурацию",
     Callback = function()
@@ -780,7 +1213,6 @@ SettingsTab:CreateButton({
     end
 })
 
--- Сброс конфига
 SettingsTab:CreateButton({
     Name = "🗑️ Сбросить конфигурацию",
     Callback = function()
@@ -795,7 +1227,7 @@ SettingsTab:CreateButton({
 })
 
 -- ==================== ОБРАБОТЧИКИ ====================
-LocalPlayer.CharacterAdded:Connect(function(c)
+localPlayer.CharacterAdded:Connect(function(c)
     task.wait(0.5)
     if GodModeEnabled then ToggleGodMode(true) end
     if NoclipEnabled then ToggleNoclip(true) end
@@ -806,8 +1238,8 @@ end)
 -- ==================== УВЕДОМЛЕНИЕ ====================
 Rayfield:Notify({ Title = "MIXWARE", Content = "MM2 Script Loaded!", Duration = 3, Image = "skull" })
 Rayfield:Notify({
-    Title = "Настройки Rayfield",
-    Content = "Перейдите во вкладку Settings",
+    Title = "ESP",
+    Content = "Настройки ESP во вкладке Visuals",
     Duration = 3,
-    Image = "settings"
+    Image = "eye"
 })
