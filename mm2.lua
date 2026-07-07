@@ -1,7 +1,3 @@
-[7/7/2026 9:28 PM] .: --[[
-    MM2 Script - Rayfield (Фикс ТП + ESP всегда)
-]]
-
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -111,7 +107,7 @@ local function CreateESP(player)
     
     ESPObjects[player] = espData
 end
-[7/7/2026 9:28 PM] .: local function RemoveESP(player)
+local function RemoveESP(player)
     local espData = ESPObjects[player]
     if espData then
         if espData.Box then espData.Box:Remove() end
@@ -174,7 +170,7 @@ local function UpdateESP()
                     espData.DistanceText.Visible = true; espData.DistanceText.Position = Vector2.new(head2D.X, boxY + height + 2)
                     espData.DistanceText.Text = math.floor(dist + 0.5) .. "m"; espData.DistanceText.Color = Color3.fromRGB(200,200,200)
                 else espData.DistanceText.Visible = false end
-[7/7/2026 9:28 PM] .: else
+            else
                 espData.Box.Visible = false; espData.NameText.Visible = false
                 espData.HealthBg.Visible = false; espData.HealthBar.Visible = false; espData.DistanceText.Visible = false
             end
