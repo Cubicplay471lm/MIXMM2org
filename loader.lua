@@ -11,7 +11,7 @@ local Window = Rayfield:CreateWindow({
     Name = "MIXWARE LOADER",
     Icon = "download",
     LoadingTitle = "MIXWARE LOADER",
-    LoadingSubtitle = "by KT471 & Lmeron",
+    LoadingSubtitle = "by KT471 & hokpry",
     Theme = "DarkBlue",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
@@ -26,7 +26,11 @@ local Window = Rayfield:CreateWindow({
         SaveKey = true,
         GrabKeyFromSite = false,
         Key = {
-            "mixwareontop"
+            "mixware2026",
+            "kt471",
+            "hokpry",
+            "mixmm2ontop",
+            "admin123"
         }
     }
 })
@@ -39,10 +43,12 @@ local SettingsTab = Window:CreateTab("Settings", "settings")
 -- ==================== ПЕРЕМЕННЫЕ ====================
 local AutoLoadEnabled = true
 local LoaderClosed = false
+local LoadedSuccess = false
 
 -- ==================== ФУНКЦИЯ ЗАГРУЗКИ ====================
 local function LoadMM2Script()
     if LoaderClosed then return end
+    if LoadedSuccess then return end
     
     Rayfield:Notify({
         Title = "MIXWARE",
@@ -57,13 +63,13 @@ local function LoadMM2Script()
     
     if success then
         loadstring(result)()
+        LoadedSuccess = true
         Rayfield:Notify({
             Title = "MIXWARE",
             Content = "MM2 Script загружен!",
             Duration = 3,
             Image = "check"
         })
-        -- Закрываем лоадер после загрузки
         task.wait(1)
         Window:Destroy()
     else
@@ -77,29 +83,25 @@ local function LoadMM2Script()
 end
 
 -- ==================== АВТОМАТИЧЕСКАЯ ЗАГРУЗКА ====================
--- Функция для автозагрузки с задержкой
 local function AutoLoad()
     if not AutoLoadEnabled then return end
+    if LoadedSuccess then return end
     
-    -- Проверяем, что ключ уже был введён (сохранён)
-    local keyFile = "mixware_key"
+    -- Проверяем сохранённый ключ
     local hasKey = false
-    
     pcall(function()
-        local content = readfile(keyFile)
+        local content = readfile("mixware_key")
         if content and content ~= "" then
             hasKey = true
         end
     end)
     
     if hasKey then
-        -- Если ключ сохранён - загружаем сразу
         task.wait(0.5)
         LoadMM2Script()
     else
-        -- Если ключа нет - ждём ввода и загружаем через 3 секунды после успешного ввода
         task.wait(3)
-        if not LoaderClosed then
+        if not LoaderClosed and not LoadedSuccess then
             LoadMM2Script()
         end
     end
@@ -126,36 +128,42 @@ CreditsTab:CreateParagraph({
     Content = "Спасибо за использование MIXWARE!\n\nНаш сайт: mixware.lol"
 })
 
--- ==================== ВКЛАДКА НАСТРОЕК ====================
+-- ==================== НАСТРОЙКИ ====================
 SettingsTab:CreateSection("Автозагрузка")
 
 SettingsTab:CreateToggle({
     Name = "🔄 Автоматическая загрузка",
     CurrentValue = AutoLoadEnabled,
-    Callback = function(value)
-        AutoLoadEnabled = value
+    Callback = function(Value)
+        AutoLoadEnabled = Value
         Rayfield:Notify({
             Title = "Автозагрузка",
-            Content = value and "Включена" or "Выключена",
+            Content = Value and "Включена" or "Выключена",
             Duration = 2,
             Image = "refresh"
         })
     end
 })
 
-SettingsTab:CreateSection("Настройки")
+SettingsTab:CreateSection("Внешний вид")
 
 local themes = {"DarkBlue", "Dark", "Light", "Amber", "Midnight", "Ocean", "Crimson", "Purple", "Green", "Galaxy"}
 SettingsTab:CreateDropdown({
     Name = "Тема",
     Options = themes,
     CurrentOption = "DarkBlue",
-    Callback = function(option)
-        Rayfield:ChangeTheme(option)
+    Callback = function(Option)
+        Rayfield:ChangeTheme(Option)
+        Rayfield:Notify({
+            Title = "Тема",
+            Content = "Изменена на: " .. Option,
+            Duration = 2,
+            Image = "palette"
+        })
     end
 })
 
--- ==================== КНОПКИ ====================
+-- ==================== ОСНОВНАЯ ВКЛАДКА ====================
 LoaderTab:CreateParagraph({
     Title = "MIXWARE LOADER",
     Content = "Нажми кнопку ниже для загрузки MM2 скрипта\n\nАвтозагрузка: " .. (AutoLoadEnabled and "✅ ВКЛ" or "❌ ВЫКЛ")
@@ -163,13 +171,16 @@ LoaderTab:CreateParagraph({
 
 LoaderTab:CreateButton({
     Name = "🚀 Загрузить MM2 Script",
-    Callback = LoadMM2Script
+    Callback = function()
+        LoadMM2Script()
+    end
 })
 
 LoaderTab:CreateButton({
     Name = "📦 Загрузить MM2 Script (Резерв)",
     Callback = function()
         if LoaderClosed then return end
+        if LoadedSuccess then return end
         
         Rayfield:Notify({
             Title = "MIXWARE",
@@ -184,6 +195,7 @@ LoaderTab:CreateButton({
         
         if success then
             loadstring(result)()
+            LoadedSuccess = true
             Rayfield:Notify({
                 Title = "MIXWARE",
                 Content = "Резервная версия загружена!",
@@ -212,11 +224,7 @@ LoaderTab:CreateButton({
 })
 
 -- ==================== ЗАПУСК АВТОЗАГРУЗКИ ====================
--- Запускаем автозагрузку после того, как интерфейс полностью загрузится
 task.spawn(function()
-    task.wait(1) -- Ждём инициализацию Rayfield
+    task.wait(1)
     AutoLoad()
 end)
-
--- Если пользователь ввёл ключ вручную через интерфейс, тоже запускаем автозагрузку
--- Rayfield сам вызывает KeySystem, мы просто ждём
