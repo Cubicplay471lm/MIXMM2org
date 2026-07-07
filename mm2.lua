@@ -1,10 +1,15 @@
+--[[
+    MM2 Script - Rayfield (Полная версия)
+    by .ftgs & NF Project
+]]
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
     Name = "MM2 Script",
     Icon = "skull",
     LoadingTitle = "MM2 Script Loading",
-    LoadingSubtitle = "by .ftgs",
+    LoadingSubtitle = "by .ftgs & NF",
     Theme = "DarkBlue",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
@@ -19,6 +24,8 @@ local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Camera = Workspace.CurrentCamera
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Variables
 local ESPEnabled = false
@@ -39,10 +46,13 @@ local FlyEnabled = false
 local FlySpeed = 50
 local NoclipConnection = nil
 local FlyConnection = nil
+local FlingEnabled = false
+local FlingConnection = nil
+local GunGrabEnabled = false
+local GunGrabConnection = nil
 
 -- ==================== ESP ====================
 local function GetPlayerRole(player)
-    -- Смотрим Backpack
     local backpack = player:FindFirstChild("Backpack")
     if backpack then
         for _, item in ipairs(backpack:GetChildren()) do
@@ -53,7 +63,6 @@ local function GetPlayerRole(player)
             end
         end
     end
-    -- Смотрим Character
     if player.Character then
         for _, item in ipairs(player.Character:GetChildren()) do
             if item:IsA("Tool") then
@@ -80,33 +89,27 @@ end
 
 local function CreateESP(player)
     if player == LocalPlayer then return end
-    
     local espData = { player = player }
-    
     local box = Drawing.new("Square")
     box.Visible = false; box.Thickness = 1.5; box.Filled = false; box.Color = Color3.fromRGB(255,255,255)
     espData.Box = box
-    
     local nameText = Drawing.new("Text")
     nameText.Visible = false; nameText.Size = 13; nameText.Center = true; nameText.Outline = true
     nameText.OutlineColor = Color3.fromRGB(0,0,0); nameText.Color = Color3.fromRGB(255,255,255); nameText.Text = player.Name
     espData.NameText = nameText
-    
     local healthBg = Drawing.new("Square")
     healthBg.Visible = false; healthBg.Filled = true; healthBg.Color = Color3.fromRGB(40,40,40)
     espData.HealthBg = healthBg
-    
     local healthBar = Drawing.new("Square")
     healthBar.Visible = false; healthBar.Filled = true; healthBar.Color = Color3.fromRGB(0,255,0)
     espData.HealthBar = healthBar
-    
     local distanceText = Drawing.new("Text")
     distanceText.Visible = false; distanceText.Size = 12; distanceText.Center = true; distanceText.Outline = true
     distanceText.OutlineColor = Color3.fromRGB(0,0,0); distanceText.Color = Color3.fromRGB(255,255,255)
     espData.DistanceText = distanceText
-    
     ESPObjects[player] = espData
 end
+
 local function RemoveESP(player)
     local espData = ESPObjects[player]
     if espData then
@@ -129,10 +132,8 @@ local function UpdateESP()
             local role = GetPlayerRole(player)
             local color = GetRoleColor(role)
             local roleName = GetRoleName(role)
-            
             local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
             local rootPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-            
             if headPos.Z > 0 then
                 local head2D = Vector2.new(headPos.X, headPos.Y)
                 local root2D = Vector2.new(rootPos.X, rootPos.Y)
@@ -140,24 +141,20 @@ local function UpdateESP()
                 local width = height * 0.65
                 local boxX = head2D.X - width / 2
                 local boxY = head2D.Y
-                
                 local dist = 0
                 if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
                 end
-                
                 if ESPBoxEnabled then
                     espData.Box.Visible = true; espData.Box.Position = Vector2.new(boxX, boxY)
                     espData.Box.Size = Vector2.new(width, height); espData.Box.Color = color
                 else espData.Box.Visible = false end
-                
                 if ESPNameEnabled then
                     espData.NameText.Visible = true; espData.NameText.Position = Vector2.new(head2D.X, boxY - 18)
                     local displayName = player.Name
                     if roleName ~= "" then displayName = player.Name .. " [" .. roleName .. "]" end
                     espData.NameText.Text = displayName; espData.NameText.Color = roleName ~= "" and color or Color3.fromRGB(255,255,255)
                 else espData.NameText.Visible = false end
-                
                 if ESPHealthEnabled then
                     local hp = humanoid.Health / humanoid.MaxHealth
                     local barX = boxX - 5; local barY = boxY; local barW = 3; local barH = height
@@ -165,7 +162,6 @@ local function UpdateESP()
                     espData.HealthBar.Visible = true; espData.HealthBar.Position = Vector2.new(barX, barY + barH * (1 - hp)); espData.HealthBar.Size = Vector2.new(barW, barH * hp)
                     espData.HealthBar.Color = hp > 0.6 and Color3.fromRGB(0,255,0) or (hp > 0.3 and Color3.fromRGB(255,255,0) or Color3.fromRGB(255,0,0))
                 else espData.HealthBg.Visible = false; espData.HealthBar.Visible = false end
-                
                 if ESPDistanceEnabled then
                     espData.DistanceText.Visible = true; espData.DistanceText.Position = Vector2.new(head2D.X, boxY + height + 2)
                     espData.DistanceText.Text = math.floor(dist + 0.5) .. "m"; espData.DistanceText.Color = Color3.fromRGB(200,200,200)
@@ -240,6 +236,73 @@ local function ToggleFly(state)
     end
 end
 
+-- ==================== FLING ====================
+local function ToggleFling(state)
+    FlingEnabled = state
+    if state then
+        if not LocalPlayer.Character then return end
+        for _, child in pairs(LocalPlayer.Character:GetDescendants()) do
+            if child:IsA("BasePart") then
+                child.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5)
+            end
+        end
+        ToggleNoclip(true)
+        wait(0.1)
+        local bambam = Instance.new("BodyAngularVelocity")
+        bambam.Name = "Fling_"
+        bambam.Parent = LocalPlayer.Character.HumanoidRootPart
+        bambam.AngularVelocity = Vector3.new(0, 99999, 0)
+        bambam.MaxTorque = Vector3.new(0, math.huge, 0)
+        bambam.P = math.huge
+        local Char = LocalPlayer.Character:GetChildren()
+        for i, v in next, Char do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+                v.Massless = true
+                v.Velocity = Vector3.new(0, 0, 0)
+            end
+        end
+        FlingConnection = RunService.RenderStepped:Connect(function()
+            if FlingEnabled and bambam and bambam.Parent then
+                bambam.AngularVelocity = Vector3.new(0, 99999, 0)
+                wait(0.2)
+                bambam.AngularVelocity = Vector3.new(0, 0, 0)
+                wait(0.1)
+            end
+        end)
+    else
+        if FlingConnection then FlingConnection:Disconnect(); FlingConnection = nil end
+        if LocalPlayer.Character then
+            local bambam = LocalPlayer.Character:FindFirstChild("Fling_")
+            if bambam then bambam:Destroy() end
+        end
+    end
+end
+
+-- ==================== GUN GRAB (Teleport to Weapon) ====================
+local function ToggleGunGrab(state)
+    GunGrabEnabled = state
+    if state then
+        GunGrabConnection = RunService.RenderStepped:Connect(function()
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+            for _, model in ipairs(Workspace:GetChildren()) do
+                if model.Name == "GunDrop" then
+                    local rootPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+                    if rootPart then
+                        local pos = rootPart.Position
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
+                        wait(0.5)
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0, 0, 0)) -- Возврат в центр карты
+                        break
+                    end
+                end
+            end
+        end)
+    else
+        if GunGrabConnection then GunGrabConnection:Disconnect(); GunGrabConnection = nil end
+    end
+end
+
 -- ==================== COMBAT ====================
 local function GetNearestPlayer(range)
     local nearest, minDist = nil, range or math.huge
@@ -255,7 +318,7 @@ end
 
 local function AutoFarmLoop() while AutoFarmEnabled do task.wait(0.1) pcall(function()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-local t = GetNearestPlayer(50)
+    local t = GetNearestPlayer(50)
     if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
         LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
     end
@@ -299,6 +362,8 @@ local MovementTab = Window:CreateTab("Movement", "plane")
 local TeleportTab = Window:CreateTab("Teleport", "map-pin")
 local FarmTab = Window:CreateTab("Farm", "coins")
 local MiscTab = Window:CreateTab("Misc", "settings")
+local FlingTab = Window:CreateTab("Fling", "zap")
+local GunTab = Window:CreateTab("Gun Grab", "target")
 
 MainTab:CreateSection("Combat")
 MainTab:CreateToggle({ Name = "Auto Farm", CurrentValue = false, Callback = function(s) AutoFarmEnabled = s; if s then task.spawn(AutoFarmLoop) end end })
@@ -316,10 +381,17 @@ VisualsTab:CreateToggle({ Name = "Box ESP", CurrentValue = true, Callback = func
 VisualsTab:CreateToggle({ Name = "Name ESP", CurrentValue = true, Callback = function(s) ESPNameEnabled = s end })
 VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = true, Callback = function(s) ESPHealthEnabled = s end })
 VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = true, Callback = function(s) ESPDistanceEnabled = s end })
+
 MovementTab:CreateSection("Movement")
 MovementTab:CreateToggle({ Name = "Noclip", CurrentValue = false, Callback = ToggleNoclip })
 MovementTab:CreateToggle({ Name = "Fly", CurrentValue = false, Callback = ToggleFly })
 MovementTab:CreateSlider({ Name = "Fly Speed", Range = {20,200}, Increment = 5, CurrentValue = 50, Callback = function(v) FlySpeed = v end })
+
+FlingTab:CreateSection("Fling")
+FlingTab:CreateToggle({ Name = "Fling", CurrentValue = false, Callback = ToggleFling })
+
+GunTab:CreateSection("Gun Grab")
+GunTab:CreateToggle({ Name = "Grab Gun on Drop", CurrentValue = false, Callback = ToggleGunGrab })
 
 TeleportTab:CreateSection("Teleport to Player")
 local playerList = {}
@@ -348,8 +420,8 @@ end })
 
 FarmTab:CreateToggle({ Name = "Auto Coin Farm", CurrentValue = false, Callback = function(s) CoinFarmEnabled = s; if s then task.spawn(CoinFarmLoop) end end })
 
-MiscTab:CreateButton({ Name = "Rejoin", Callback = function() game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end })
-MiscTab:CreateButton({ Name = "Server Hop", Callback = function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end })
+MiscTab:CreateButton({ Name = "Rejoin", Callback = function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end })
+MiscTab:CreateButton({ Name = "Server Hop", Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end })
 MiscTab:CreateButton({ Name = "Destroy GUI", Callback = function() Rayfield:Destroy() end })
 
 LocalPlayer.CharacterAdded:Connect(function(c)
