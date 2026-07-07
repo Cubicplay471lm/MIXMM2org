@@ -6,16 +6,99 @@
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- ==================== ВОДЯНОЙ ЗНАК ====================
+local function CreateWatermark()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MIXWARE_Watermark"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = game:GetService("CoreGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 340, 0, 35)
+    frame.Position = UDim2.new(0, 10, 1, -45)
+    frame.BackgroundTransparency = 0.7
+    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+    
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 40)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 40, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 40))
+    })
+    gradient.Parent = frame
+    
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.Text = "MIXWARE | MM2 | " .. os.date("%H:%M:%S") .. " | SPEED: 0"
+    text.TextColor3 = Color3.fromRGB(200, 200, 220)
+    text.TextSize = 14
+    text.Font = Enum.Font.GothamBold
+    text.TextXAlignment = Enum.TextXAlignment.Center
+    text.TextYAlignment = Enum.TextYAlignment.Center
+    text.Parent = frame
+    
+    spawn(function()
+        local lastPos = Vector3.new()
+        local player = game:GetService("Players").LocalPlayer
+        while true do
+            task.wait(0.5)
+            local speed = 0
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local currentPos = char.HumanoidRootPart.Position
+                speed = math.floor((currentPos - lastPos).Magnitude / 0.5)
+                lastPos = currentPos
+            end
+            text.Text = "MIXWARE | MM2 | " .. os.date("%H:%M:%S") .. " | SPEED: " .. speed .. " | KT471 & hokpry"
+        end
+    end)
+    
+    return screenGui
+end
+
+CreateWatermark()
+
+-- ==================== ЗАГРУЗКА ESP ====================
+local ESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/linemaster2/esp-library/main/library.lua"))();
+
+ESP.Enabled = false
+ESP.ShowBox = false
+ESP.ShowName = false
+ESP.ShowHealth = false
+ESP.ShowDistance = false
+ESP.ShowTracer = false
+ESP.ShowSkeletons = false
+ESP.Color = Color3.fromRGB(255, 255, 255)
+ESP.MaxDistance = 500
+ESP.ShowTeammates = false
+ESP.BoxType = "Corner Box Esp"
+
+-- ==================== GUI ====================
 local Window = Rayfield:CreateWindow({
     Name = "MIXWARE | MM2 Script",
     Icon = "skull",
     LoadingTitle = "MIXWARE Loading...",
-    LoadingSubtitle = "by KT471 & Lmeron",
+    LoadingSubtitle = "by KT471 & hokpry",
     Theme = "DarkBlue",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
-    ConfigurationSaving = { Enabled = true, FolderName = "mixware", FileName = "config" },
-    Discord = { Enabled = false, Invite = "", RememberJoins = true },
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "mixware",
+        FileName = "config"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = true
+    },
     KeySystem = false,
 })
 
@@ -28,12 +111,6 @@ local Camera = Workspace.CurrentCamera
 local TeleportService = game:GetService("TeleportService")
 
 -- Variables
-local ESPEnabled = false
-local ESPBoxEnabled = true
-local ESPNameEnabled = true
-local ESPHealthEnabled = true
-local ESPDistanceEnabled = true
-local ESPObjects = {}
 local AutoFarmEnabled = false
 local KillAuraEnabled = false
 local GodModeEnabled = false
@@ -54,56 +131,6 @@ local GunGrabEnabled = false
 local GunGrabConnection = nil
 local KillAuraConnection = nil
 local KillAuraCooldown = false
-
--- ==================== ВОДЯНОЙ ЗНАК ====================
-local function CreateWatermark()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "MIXWARE_Watermark"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = game:GetService("CoreGui")
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 320, 0, 35)
-    frame.Position = UDim2.new(0, 10, 1, -45)
-    frame.BackgroundTransparency = 0.7
-    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-    frame.BorderSizePixel = 0
-    frame.Parent = screenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
-    
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1, 0, 1, 0)
-    text.BackgroundTransparency = 1
-    text.Text = "MIXWARE | MM2 | " .. os.date("%H:%M:%S") .. " | SPEED: 0"
-    text.TextColor3 = Color3.fromRGB(200, 200, 220)
-    text.TextSize = 15
-    text.Font = Enum.Font.GothamBold
-    text.TextXAlignment = Enum.TextXAlignment.Center
-    text.TextYAlignment = Enum.TextYAlignment.Center
-    text.Parent = frame
-    
-    spawn(function()
-        local lastPos = Vector3.new()
-        while true do
-            task.wait(0.5)
-            local char = LocalPlayer.Character
-            local speed = 0
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local currentPos = char.HumanoidRootPart.Position
-                speed = math.floor((currentPos - lastPos).Magnitude / 0.5)
-                lastPos = currentPos
-            end
-            text.Text = "MIXWARE | MM2 | " .. os.date("%H:%M:%S") .. " | SPEED: " .. speed .. " | KT471 & hokpry"
-        end
-    end)
-    
-    return screenGui
-end
-
-CreateWatermark()
 
 -- ==================== ESP ====================
 local function GetPlayerRole(player)
@@ -135,114 +162,35 @@ local function GetRoleColor(role)
     return Color3.fromRGB(128, 128, 128)
 end
 
-local function GetRoleName(role)
-    if role == "murderer" then return "МАНЬЯК" end
-    if role == "sheriff" then return "ШЕРИФ" end
-    return ""
-end
-
-local function CreateESP(player)
-    if player == LocalPlayer then return end
-    local espData = { player = player }
-    local box = Drawing.new("Square")
-    box.Visible = false; box.Thickness = 1.5; box.Filled = false; box.Color = Color3.fromRGB(255,255,255)
-    espData.Box = box
-    local nameText = Drawing.new("Text")
-    nameText.Visible = false; nameText.Size = 13; nameText.Center = true; nameText.Outline = true
-    nameText.OutlineColor = Color3.fromRGB(0,0,0); nameText.Color = Color3.fromRGB(255,255,255); nameText.Text = player.Name
-    espData.NameText = nameText
-    local healthBg = Drawing.new("Square")
-    healthBg.Visible = false; healthBg.Filled = true; healthBg.Color = Color3.fromRGB(40,40,40)
-    espData.HealthBg = healthBg
-    local healthBar = Drawing.new("Square")
-    healthBar.Visible = false; healthBar.Filled = true; healthBar.Color = Color3.fromRGB(0,255,0)
-    espData.HealthBar = healthBar
-    local distanceText = Drawing.new("Text")
-    distanceText.Visible = false; distanceText.Size = 12; distanceText.Center = true; distanceText.Outline = true
-    distanceText.OutlineColor = Color3.fromRGB(0,0,0); distanceText.Color = Color3.fromRGB(255,255,255)
-    espData.DistanceText = distanceText
-    ESPObjects[player] = espData
-end
-
-local function RemoveESP(player)
-    local espData = ESPObjects[player]
-    if espData then
-        if espData.Box then espData.Box:Remove() end
-        if espData.NameText then espData.NameText:Remove() end
-        if espData.HealthBg then espData.HealthBg:Remove() end
-        if espData.HealthBar then espData.HealthBar:Remove() end
-        if espData.DistanceText then espData.DistanceText:Remove() end
-        ESPObjects[player] = nil
-    end
-end
-
-local function UpdateESP()
-    for player, espData in pairs(ESPObjects) do
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char:FindFirstChild("Head") then
-            local root = char.HumanoidRootPart
-            local head = char.Head
-            local humanoid = char.Humanoid
-            local role = GetPlayerRole(player)
-            local color = GetRoleColor(role)
-            local roleName = GetRoleName(role)
-            local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-            local rootPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-            if headPos.Z > 0 then
-                local head2D = Vector2.new(headPos.X, headPos.Y)
-                local root2D = Vector2.new(rootPos.X, rootPos.Y)
-                local height = math.abs(root2D.Y - head2D.Y)
-                local width = height * 0.65
-                local boxX = head2D.X - width / 2
-                local boxY = head2D.Y
-                local dist = 0
-                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
-                end
-                if ESPBoxEnabled then
-                    espData.Box.Visible = true; espData.Box.Position = Vector2.new(boxX, boxY)
-                    espData.Box.Size = Vector2.new(width, height); espData.Box.Color = color
-                else espData.Box.Visible = false end
-                if ESPNameEnabled then
-                    espData.NameText.Visible = true; espData.NameText.Position = Vector2.new(head2D.X, boxY - 18)
-                    local displayName = player.Name
-                    if roleName ~= "" then displayName = player.Name .. " [" .. roleName .. "]" end
-                    espData.NameText.Text = displayName; espData.NameText.Color = roleName ~= "" and color or Color3.fromRGB(255,255,255)
-                else espData.NameText.Visible = false end
-                if ESPHealthEnabled then
-                    local hp = humanoid.Health / humanoid.MaxHealth
-                    local barX = boxX - 5; local barY = boxY; local barW = 3; local barH = height
-                    espData.HealthBg.Visible = true; espData.HealthBg.Position = Vector2.new(barX, barY); espData.HealthBg.Size = Vector2.new(barW, barH)
-                    espData.HealthBar.Visible = true; espData.HealthBar.Position = Vector2.new(barX, barY + barH * (1 - hp)); espData.HealthBar.Size = Vector2.new(barW, barH * hp)
-                    espData.HealthBar.Color = hp > 0.6 and Color3.fromRGB(0,255,0) or (hp > 0.3 and Color3.fromRGB(255,255,0) or Color3.fromRGB(255,0,0))
-                else espData.HealthBg.Visible = false; espData.HealthBar.Visible = false end
-                if ESPDistanceEnabled then
-                    espData.DistanceText.Visible = true; espData.DistanceText.Position = Vector2.new(head2D.X, boxY + height + 2)
-                    espData.DistanceText.Text = math.floor(dist + 0.5) .. "m"; espData.DistanceText.Color = Color3.fromRGB(200,200,200)
-                else espData.DistanceText.Visible = false end
-            else
-                espData.Box.Visible = false; espData.NameText.Visible = false
-                espData.HealthBg.Visible = false; espData.HealthBar.Visible = false; espData.DistanceText.Visible = false
-            end
-        else
-            espData.Box.Visible = false; espData.NameText.Visible = false
-            espData.HealthBg.Visible = false; espData.HealthBar.Visible = false; espData.DistanceText.Visible = false
-        end
-    end
+local function UpdateESPColor(player)
+    if not player then return end
+    local role = GetPlayerRole(player)
+    local color = GetRoleColor(role)
+    ESP:SetColor(color)
 end
 
 local function ToggleESP(state)
-    ESPEnabled = state
+    ESP.Enabled = state
     if state then
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and not ESPObjects[player] then CreateESP(player) end
+            if player ~= LocalPlayer then
+                UpdateESPColor(player)
+            end
         end
-    else
-        for player, _ in pairs(ESPObjects) do RemoveESP(player) end
     end
+    ESP.Toggle(state)
 end
 
-task.spawn(function() while true do if ESPEnabled then UpdateESP() end; task.wait() end end)
+Players.PlayerAdded:Connect(function(player)
+    if ESP.Enabled then
+        player.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if ESP.Enabled then
+                UpdateESPColor(player)
+            end
+        end)
+    end
+end)
 
 -- ==================== NOCLIP ====================
 local function ToggleNoclip(state)
@@ -417,7 +365,7 @@ local function ToggleGunGrab(state)
     end
 end
 
--- ==================== KILL AURA (НОВАЯ ЛОГИКА) ====================
+-- ==================== KILL AURA ====================
 local function GetClosestPlayerToCursor()
     local closest = nil
     local minAngle = math.huge
@@ -596,13 +544,15 @@ local FarmTab = Window:CreateTab("Farm", "coins")
 local MiscTab = Window:CreateTab("Misc", "settings")
 local FlingTab = Window:CreateTab("Fling", "zap")
 local GunTab = Window:CreateTab("Gun Grab", "target")
+local SettingsTab = Window:CreateTab("Settings", "settings")
 
+-- ==================== MAIN TAB ====================
 MainTab:CreateSection("Combat")
 MainTab:CreateToggle({ Name = "Auto Farm", CurrentValue = false, Callback = function(s) AutoFarmEnabled = s; if s then task.spawn(AutoFarmLoop) end end })
 
-MainTab:CreateSection("Kill Aura (NEW)")
+MainTab:CreateSection("Kill Aura")
 MainTab:CreateToggle({ Name = "Kill Aura", CurrentValue = false, Callback = ToggleKillAura })
-MainTab:CreateSlider({ Name = "Kill Aura Range (for Murderer)", Range = {5,50}, Increment = 1, Suffix = "studs", CurrentValue = 15, Callback = function(v) KillAuraRange = v end })
+MainTab:CreateSlider({ Name = "Kill Aura Range", Range = {5,50}, Increment = 1, Suffix = "studs", CurrentValue = 15, Callback = function(v) KillAuraRange = v end })
 
 local keyOptions = {"Q", "Y"}
 MainTab:CreateDropdown({
@@ -641,24 +591,54 @@ MainTab:CreateToggle({ Name = "God Mode", CurrentValue = false, Callback = Toggl
 MainTab:CreateSlider({ Name = "Walk Speed", Range = {16,200}, Increment = 1, CurrentValue = 16, Callback = function(v) WalkSpeed = v; if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = v end end })
 MainTab:CreateSlider({ Name = "Jump Power", Range = {50,300}, Increment = 1, CurrentValue = 50, Callback = function(v) JumpPower = v; if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.JumpPower = v end end })
 
-VisualsTab:CreateSection("ESP")
+-- ==================== VISUALS TAB ====================
+VisualsTab:CreateSection("ESP Settings")
 VisualsTab:CreateToggle({ Name = "ESP Master", CurrentValue = false, Callback = ToggleESP })
-VisualsTab:CreateToggle({ Name = "Box ESP", CurrentValue = true, Callback = function(s) ESPBoxEnabled = s end })
-VisualsTab:CreateToggle({ Name = "Name ESP", CurrentValue = true, Callback = function(s) ESPNameEnabled = s end })
-VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = true, Callback = function(s) ESPHealthEnabled = s end })
-VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = true, Callback = function(s) ESPDistanceEnabled = s end })
 
+VisualsTab:CreateSection("ESP Types")
+VisualsTab:CreateToggle({ Name = "Box ESP", CurrentValue = false, Callback = function(s) ESP.ShowBox = s end })
+VisualsTab:CreateToggle({ Name = "Name ESP", CurrentValue = false, Callback = function(s) ESP.ShowName = s end })
+VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Callback = function(s) ESP.ShowHealth = s end })
+VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = false, Callback = function(s) ESP.ShowDistance = s end })
+VisualsTab:CreateToggle({ Name = "Tracer", CurrentValue = false, Callback = function(s) ESP.ShowTracer = s end })
+
+VisualsTab:CreateSection("ESP Colors")
+VisualsTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "ESPColor",
+    Callback = function(Color)
+        ESP.Color = Color
+        ESP:SetColor(Color)
+    end
+})
+
+VisualsTab:CreateSlider({
+    Name = "ESP Distance",
+    Range = {50, 1000},
+    Increment = 50,
+    Suffix = "studs",
+    CurrentValue = 500,
+    Callback = function(v)
+        ESP.MaxDistance = v
+    end
+})
+
+-- ==================== MOVEMENT TAB ====================
 MovementTab:CreateSection("Movement")
 MovementTab:CreateToggle({ Name = "Noclip", CurrentValue = false, Callback = ToggleNoclip })
 MovementTab:CreateToggle({ Name = "Fly", CurrentValue = false, Callback = ToggleFly })
 MovementTab:CreateSlider({ Name = "Fly Speed", Range = {20,200}, Increment = 5, CurrentValue = 50, Callback = function(v) FlySpeed = v end })
 
+-- ==================== FLING TAB ====================
 FlingTab:CreateSection("Fling")
 FlingTab:CreateToggle({ Name = "Fling", CurrentValue = false, Callback = ToggleFling })
 
+-- ==================== GUN TAB ====================
 GunTab:CreateSection("Gun Grab")
 GunTab:CreateToggle({ Name = "Grab Gun on Drop", CurrentValue = false, Callback = ToggleGunGrab })
 
+-- ==================== TELEPORT TAB ====================
 TeleportTab:CreateSection("Teleport to Player")
 local playerList = {}
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(playerList, p.Name) end end
@@ -684,12 +664,137 @@ TeleportTab:CreateButton({ Name = "Refresh", Callback = function()
     tpDropdown:Refresh(names)
 end })
 
+-- ==================== FARM TAB ====================
 FarmTab:CreateToggle({ Name = "Auto Coin Farm", CurrentValue = false, Callback = function(s) CoinFarmEnabled = s; if s then task.spawn(CoinFarmLoop) end end })
 
+-- ==================== MISC TAB ====================
 MiscTab:CreateButton({ Name = "Rejoin", Callback = function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end })
 MiscTab:CreateButton({ Name = "Server Hop", Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end })
-MiscTab:CreateButton({ Name = "Destroy GUI", Callback = function() Rayfield:Destroy() end })
+MiscTab:CreateButton({ Name = "Destroy GUI", Callback = function() Window:Destroy() end })
 
+-- ==================== SETTINGS TAB (НАСТРОЙКИ RAYFIELD) ====================
+SettingsTab:CreateSection("Внешний вид меню")
+
+-- Выбор темы
+local themes = {"DarkBlue", "Dark", "Light", "Amber", "Midnight", "Ocean", "Crimson", "Purple", "Green", "Galaxy"}
+SettingsTab:CreateDropdown({
+    Name = "Тема меню",
+    Options = themes,
+    CurrentOption = "DarkBlue",
+    Callback = function(option)
+        Rayfield:ChangeTheme(option)
+        Rayfield:Notify({
+            Title = "Тема",
+            Content = "Изменена на: " .. option,
+            Duration = 2,
+            Image = "palette"
+        })
+    end
+})
+
+SettingsTab:CreateSection("Прозрачность меню")
+
+local TransparencySlider = SettingsTab:CreateSlider({
+    Name = "Прозрачность фона",
+    Range = {0, 100},
+    Increment = 5,
+    Suffix = "%",
+    CurrentValue = 0,
+    Callback = function(v)
+        local transparency = v / 100
+        -- Применяем прозрачность к основным элементам Rayfield
+        pcall(function()
+            local mainGui = Rayfield:GetGui()
+            if mainGui then
+                for _, child in ipairs(mainGui:GetDescendants()) do
+                    if child:IsA("Frame") or child:IsA("ImageLabel") then
+                        child.BackgroundTransparency = transparency
+                    end
+                end
+            end
+        end)
+        Rayfield:Notify({
+            Title = "Прозрачность",
+            Content = "Установлена: " .. v .. "%",
+            Duration = 1,
+            Image = "eye"
+        })
+    end
+})
+
+SettingsTab:CreateSection("Управление")
+
+SettingsTab:CreateButton({
+    Name = "👁️ Скрыть меню (K)",
+    Callback = function()
+        Rayfield:SetVisibility(false)
+        Rayfield:Notify({
+            Title = "Меню",
+            Content = "Скрыто. Нажми K чтобы показать",
+            Duration = 2,
+            Image = "eye"
+        })
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "👁️ Показать меню",
+    Callback = function()
+        Rayfield:SetVisibility(true)
+        Rayfield:Notify({
+            Title = "Меню",
+            Content = "Показано",
+            Duration = 2,
+            Image = "eye"
+        })
+    end
+})
+
+SettingsTab:CreateSection("Конфигурации")
+
+-- Сохранение конфига
+SettingsTab:CreateButton({
+    Name = "💾 Сохранить конфигурацию",
+    Callback = function()
+        Rayfield:SaveConfiguration()
+        Rayfield:Notify({
+            Title = "Конфигурация",
+            Content = "Сохранена!",
+            Duration = 2,
+            Image = "check"
+        })
+    end
+})
+
+-- Загрузка конфига
+SettingsTab:CreateButton({
+    Name = "📂 Загрузить конфигурацию",
+    Callback = function()
+        Rayfield:LoadConfiguration()
+        Rayfield:Notify({
+            Title = "Конфигурация",
+            Content = "Загружена!",
+            Duration = 2,
+            Image = "check"
+        })
+    end
+})
+
+-- Сброс конфига
+SettingsTab:CreateButton({
+    Name = "🗑️ Сбросить конфигурацию",
+    Callback = function()
+        Rayfield:ResetConfiguration()
+        Rayfield:Notify({
+            Title = "Конфигурация",
+            Content = "Сброшена!",
+            Duration = 2,
+            Image = "x"
+        })
+    end
+})
+
+-- ==================== ОБРАБОТЧИКИ ====================
 LocalPlayer.CharacterAdded:Connect(function(c)
     task.wait(0.5)
     if GodModeEnabled then ToggleGodMode(true) end
@@ -698,8 +803,11 @@ LocalPlayer.CharacterAdded:Connect(function(c)
     if hum then hum.WalkSpeed = WalkSpeed; hum.JumpPower = JumpPower end
 end)
 
-Players.PlayerAdded:Connect(function(p)
-    if ESPEnabled then p.CharacterAdded:Connect(function() task.wait(0.5); CreateESP(p) end) end
-end)
-
+-- ==================== УВЕДОМЛЕНИЕ ====================
 Rayfield:Notify({ Title = "MIXWARE", Content = "MM2 Script Loaded!", Duration = 3, Image = "skull" })
+Rayfield:Notify({
+    Title = "Настройки Rayfield",
+    Content = "Перейдите во вкладку Settings",
+    Duration = 3,
+    Image = "settings"
+})
